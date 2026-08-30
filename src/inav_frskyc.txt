@@ -1,0 +1,147 @@
+#
+
+#include <stdio.h>
+#include "hardware/uart.h"
+#include "hardware/gpio.h"
+#include "inav_ltm.h"
+#include "param.h"
+#include "tools.h"
+
+#define INAV_UART uart1
+#define INAV_BAUDRATE 19200
+
+extern field fields[];
+
+// Initialisiert die UART-Schnittstelle fuer den iNav SmartPort-Empfang (Invertiert).
+void init_inav_ltm() {
+    uart_init(INAV_UART, INAV_BAUDRATE);                      // UART mit 19200 Baud starten
+    uart_set_hw_flow(INAV_UART, false, false);                // Kein Hardware-Flow-Control
+    uart_set_format(INAV_UART, 8, 1, UART_PARITY_NONE);       // Format 8N1
+    
+    gpio_set_function(5, GPIO_FUNC_UART);                     // Pin GP5 als RX zuweisen
+
+    // Internen Hardware-Inverter des RP2040 fuer den RX-Pin aktivieren
+    #ifndef UART_UARTCR_RXINV_BITS
+    #define UART_UARTCR_RXINV_BITS 0x00004000 
+    #endif
+    hw_write_masked(&uart_get_hw(INAV_UART)->cr, UART_UARTCR_RXINV_BITS, UART_UARTCR_RXINV_BITS);
+}
+
+// Deine hochperformante 10-Byte-Zustandsmaschine
+void handleMultiProtocol_N(uint8_t b) {
+    static enum { HUNT, HUNT_PHYSICAL, HUNT_PREFIX, DATA } state = HUNT;               
+    static uint8_t buffer[10];                                          
+    static uint8_t idx = 0;                                             
+    static bool escape = false;                                         
+
+    switch (state) {
+        case HUNT:
+            escape = false;                                             
+            if (b == 0x7E) {
+                buffer[0] = b;                                          
+                state = HUNT_PHYSICAL;                                  
+            }
+            break;
+
+        case HUNT_PHYSICAL:
+            if (b == 0x7E) { buffer[0] = b; state = HUNT_PHYSICAL; break; }
+            if (b == 0x7D) { state = HUNT; break; }
+
+            buffer[1] = b;                                              
+            state = HUNT_PREFIX;                                        
+            break;
+
+        case HUNT_PREFIX:
+            if (b == 0x7E) { buffer[0] = b; state = HUNT_PHYSICAL; break; }
+            if (b == 0x7D) { state = HUNT; break; }                     
+
+            if (b == 0x10 || b == 0x5E) {                               
+                buffer[2] = b;                                          
+                idx = 3;                                                
+                state = DATA;                                           
+            } else {
+                state = HUNT;                                           
+            }
+            break;
+
+        case DATA:
+            if (b == 0x7E) {
+                buffer[0] = b;
+                state = HUNT_PHYSICAL;
+                break;
+            }
+
+            if (b == 0x7D) { escape = true; return; }                   
+            if (escape) { b ^= 0x20; escape = false; }                  
+
+            if (idx < 10) buffer[idx++] = b;                            
+            
+            if (idx >= 10) {                                            
+                // KORREKTUR: Expliziter Zugriff auf die exakten Indizes des 10-Byte-Frames!
+                // buffer[0]=0x7E, buffer[1]=PhysID, buffer[2]=Prefix(0x10)
+                // buffer[3] und buffer[4] enthalten die 2-Byte Sensor-ID
+                uint16_t id = (uint16_t)(buffer[3] | (buffer[4] << 8));             
+                
+                // buffer[5] bis buffer[8] enthalten den 32-Bit Nutzwert (Little Endian)
+                int32_t val = (int32_t)( (uint32_t)buffer[5]        | 
+                                       ((uint32_t)buffer[6] << 8)   | 
+                                       ((uint32_t)buffer[7] << 16)  | 
+                                       ((uint32_t)buffer[8] << 24) );            
+
+                if (id != 0 && id != 0xFFFF && id != 0x504D) {          
+                    
+                    switch (id) {
+                        case 0x0600: // VFAS (Akkuspannung) - iNav sendet 0.1V Schritte (z.B. 124 = 12.4V)
+                            fields[MVOLT].value = val * 100; // In Millivolt umrechnen
+                            fields[MVOLT].available = true;
+                            break;
+
+                        case 0x0210: // Current (Strom) - iNav sendet 0.1A Schritte (z.B. 150 = 15.0A)
+                            fields[CURRENT].value = val * 100; // In mA umrechnen
+                            fields[CURRENT].available = true;
+                            break;
+
+                        case 0x0211: // Fuel (Kapazität) in mAh
+                            fields[CAPACITY].value = val;
+                            fields[CAPACITY].available = true;
+                            break;
+
+                        case 0x0800: // Altitude (Höhe) in Zentimetern
+                            fields[ALTITUDE].value = (val == 0) ? 100 : val;
+                            fields[ALTITUDE].available = true;
+                            break;
+
+                        case 0x0830: // VSpd (Vario-Steigrate) in cm/s
+                            fields[VSPEED].value = val; 
+                            fields[VSPEED].available = true;
+                            break;
+
+                        case 0x0511: // GPS Groundspeed
+                            fields[GROUNDSPEED].value = val; 
+                            fields[GROUNDSPEED].available = true;
+                            break;
+
+                        case 0x0820: // GPS Satelliten-Anzahl
+                            fields[NUMSAT].value = val & 0xFF; 
+                            fields[NUMSAT].available = true;
+                            break;
+                    }
+                }
+                state = HUNT;                                           
+            }
+
+            break;
+    }
+}
+
+// Der serielle Loop-Verteiler für Core 0
+void parse_inav_ltm() {
+    while (uart_is_readable(INAV_UART)) {
+        uint8_t raw_byte = uart_getc(INAV_UART);
+        handleMultiProtocol_N(raw_byte); // Jagt jedes Byte durch deine V5-State-Machine!
+    }
+}
+
+
+
+
