@@ -320,22 +320,46 @@ void decodeFrSkyCells(int32_t val) {
 }
 
 void decode0x100(int32_t val) {// 🏔️ FrSky Vario: Absolute Höhe -> in relative Höhe umrechnen
-    extern int32_t live_alt_rel;
-    static int32_t alt_offset = 0;
-    static bool alt_offset_stored = false;
+extern int32_t live_alt_rel;
+static int32_t alt_offset = 0;
+static uint32_t telemetry_start_time = 0;
+static bool first_telemetry_received = false;
+static bool offset_captured = false;
 
-    // Beim allerersten empfangenen Paket merken wir uns die Basishöhe
-    if (!alt_offset_stored && val != 0) {
-        alt_offset = val;
-            alt_offset_stored = true;
+// 🟢 Schritt 1: Wir warten, bis ÜBERHAUPT das erste Mal ein echter Wert reinkommt
+if (!first_telemetry_received) {
+    if (val != 0 && val != -1) { // -1 und 0 filtern (Protokoll-Rauschen beim Einschalten)
+        telemetry_start_time = to_ms_since_boot(get_absolute_time()); // Timer JETZT ERST starten!
+        first_telemetry_received = true;
+    }
+    // Solange kein echtes Signal da ist, geben wir zur Sicherheit 990 aus
+    setField(fields[RELATIVEALT], 990);
+    return; // Funktion für dieses Paket abbrechen, bis echte Daten da sind
+}
+
+uint32_t time_elapsed = to_ms_since_boot(get_absolute_time()) - telemetry_start_time;
+
+// 🟢 Phase 1: Die 10 Sekunden Aufwärmphase LAUFEN AB JETZT (Signal ist da!)
+if (time_elapsed < 5000) {
+    live_alt_rel = 99990; 
+    //setField(fields[RELATIVEALT], 99990); // Zeigt stabil 99m im Display während des Einmessens
+} 
+// 🟢 Phase 2: Die 10 Sekunden echten Datenflusses sind um -> Offset fixieren
+else {
+    // Genau einmalig nach den 10 Sekunden den nun absolut stabilen Warm-Wert greifen
+    if (!offset_captured) {
+        if (val != 0) {
+            alt_offset = val;
+            offset_captured = true;
         }
+    }
 
-        // Ziehe die Basishöhe ab, um die echte relative Höhe (Start bei 0 cm) zu erhalten
-
+    // Ab jetzt die echte relative Höhe berechnen (Startet perfekt bei 0)
     live_alt_rel = val - alt_offset; 
-    //has_alt_rel = true;
-    //setField(fields[CURRENT], 30000);
-    setField(fields[RELATIVEALT], val - alt_offset); 
+    setField(fields[RELATIVEALT], live_alt_rel); 
+}
+
+
 
 }
 
@@ -496,8 +520,20 @@ void decode0x820(int32_t val) { // GPS Höhe
 
     // Ziehe die Basishöhe ab, um die echte relative Höhe (Start bei 0 cm) zu erhalten
     live_alt = val ;  //- alt_offset;
+    setField(fields[ALTITUDE], live_alt); // - alt_offset);
+    //setField(fields[ALTITUDE], fields[RELATIVEALT].value);
+
+    if  ( ! fields[RELATIVEALT].available) {
+        // Wenn die relative Höhe bereits verfügbar ist, aktualisieren wir sie
+        
+    } else {
+        // Wenn die relative Höhe noch nicht verfügbar ist, setzen wir sie auf 0
+       // setField(fields[ALTITUDE], fields[RELATIVEALT].value);
+
     }   
-    
+}
+
+
 void decode0x830(int32_t val) {
 
     extern int32_t live_speed;
@@ -526,11 +562,6 @@ void decode0x840(int32_t val) {
    if (live_sat >= 4) { fields[HEADING].value = val; }// GPS: Kurs (Heading)
     
 }
-
-
-
-
-
 
 
 

@@ -242,7 +242,7 @@ bool sendHottFrame(uint8_t data) { // return true when a frame is being sent
             sendingRequired = fillHottGpsFrame();
             break;
         case HOTT_TELEMETRY_VARIO_SENSOR_ID:  
-            sendingRequired = fillHottVarioFrame();
+            //sendingRequired = fillHottVarioFrame();
             break;
     }
     if (sendingRequired) { // when buffer is filled, it can be sent
@@ -489,7 +489,7 @@ static uint8_t convertGpsFix[5] = {0x2d , 0x2d , 0x32 , 0x33 , 0x44 } ;
 
 bool fillHottGpsFrame(){ // Angepasst an Converter!
     // 🟢 GEÄNDERT: Einstiegssperre erweitert um die Protokoll-Bedingung für den Wandler-Betrieb
-    if ( ! gps.gpsInstalled && !(config.inav_ltm == 3 || config.inav_ltm == 4) ) return false ;              
+     if ( ! gps.gpsInstalled && !(config.inav_ltm == 3 || config.inav_ltm == 4) ) return false ;              
 
     memset(&TxHottData.txBuffer[0], 0 , TXHOTTDATA_BUFFERSIZE) ;
     TxHottData.gpsMsg.startByte    = 0x7c ;
@@ -540,7 +540,7 @@ bool fillHottGpsFrame(){ // Angepasst an Converter!
         } 
         else {
             // 🟢 GEÄNDERT: Neuer Tisch-Modus! Wenn das Protokoll läuft, aber noch < 4 Satelliten da sind, werden alle Werte starr auf 0 gesetzt
-            TxHottData.gpsMsg.flightDirection = 0 ;
+           /* TxHottData.gpsMsg.flightDirection = 0 ;
             TxHottData.gpsMsg.GPSSpeedLow     = 0 ;
             TxHottData.gpsMsg.GPSSpeedHigh    = 0 ;
             TxHottData.gpsMsg.LatitudeNS      = 0 ;
@@ -556,7 +556,7 @@ bool fillHottGpsFrame(){ // Angepasst an Converter!
             TxHottData.gpsMsg.distanceLow     = 0 ;
             TxHottData.gpsMsg.distanceHigh    = 0 ;
             TxHottData.gpsMsg.HomeDirection   = 0 ;
-            altitudeHott                      = 500 ;                                     // entspricht 0 Meter im HoTT-Standard
+            altitudeHott                      = 500 ;      */                               // entspricht 0 Meter im HoTT-Standard
         }
     }
                   
@@ -594,6 +594,11 @@ bool fillHottGpsFrame(){ // Angepasst an Converter!
         TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] += TxHottData.txBuffer[i];
     }  // end for
 
+    /*if (fields[LONGITUDE].available == true) {
+        return true;
+    } else {
+        return false;
+    }*/
     return true;
 }
 

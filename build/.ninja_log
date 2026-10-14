@@ -1,13 +1,13 @@
 # ninja log v5
 185	778	8134238022099716	CMakeFiles/oXs.dir/src/inav_ltm.cpp.obj	b6baec0a9fb020d2
 992	1350	8114202938594267	CMakeFiles/oXs.dir/src/mpu_bu.cpp.obj	923c78e0011a879d
-23	52	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+27	57	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
 145	317	8089390003359117	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_exbus_tx_rx.pio.h	b5b16c94010f6c79
 926	1198	8114202936960632	CMakeFiles/oXs.dir/src/mpu_-_mahony_for_vario.cpp.obj	c6bc177544e1e269
 128	317	8089390003323599	uart_sport_tx_rx.pio.h	18c0bb93a94b06b8
 128	317	8089390003323599	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_sport_tx_rx.pio.h	18c0bb93a94b06b8
-94	2376	8136534648657816	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
 168	328	8089390003359117	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_frsky_hub_tx.pio.h	350c6c8f3e9d7421
+72	410	8136737571246783	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
 2499	3851	8114202962744576	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_bootrom/bootrom.c.obj	6488a0c1d7994d5b
 145	317	8089390003359117	uart_exbus_tx_rx.pio.h	b5b16c94010f6c79
 95	1226	8114202937454288	CMakeFiles/oXs.dir/src/MPU6050.cpp.obj	b3862ceb2df0b141
@@ -109,7 +109,7 @@
 2112	2509	8114202950238268	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_time/timeout_helper.c.obj	35883b1459c84417
 1184	1866	8134238033127174	CMakeFiles/oXs.dir/src/sx126x_driver.cpp.obj	1fec69394a10ca5f
 2047	2499	8114202949994617	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_sync/mutex.c.obj	4d3f396db996e7fd
-93	700	8136522454088795	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
+81	641	8136737573569969	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
 2132	2535	8114202950481561	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_util/datetime.c.obj	168d681623e714ed
 2203	2961	8114202953433021	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_vreg/vreg.c.obj	3ead33bed10b55a7
 2303	2848	8114202952133677	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_xosc/xosc.c.obj	5fff36f64daa2012
@@ -160,88 +160,105 @@
 10719	12953	8114203054705795	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_pio/pio.c.obj	abe0c728e0ab3166
 10028	12999	8114203055194063	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/lib/tinyusb/src/common/tusb_fifo.c.obj	d88195506a8e6f53
 54	4532	8110414966244363	oXs.elf	cd87ddc49aee0e39
-44	821	8136647727303297	build.ninja	e980303d1d7b87e1
+44	821	8136939222602089	build.ninja	e980303d1d7b87e1
 52	82	8110444195352631	uart_frsky_master.pio.h	f4dd4a27786866f5
 52	82	8110444195352631	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_frsky_master.pio.h	f4dd4a27786866f5
 290	3252	8134236943680363	FrSky_2_CRSF.elf	918671795bab5b43
-64	3252	8136534790859998	FrSky_2_HoTT.elf	1631f53b81c4f35a
-7	27	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-14	36	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-48	724	8136667461888733	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-725	4030	8136667465076379	FrSky_2_HoTT.elf	1631f53b81c4f35a
-25	54	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-69	359	8136668896020515	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-359	3518	8136668898670718	FrSky_2_HoTT.elf	1631f53b81c4f35a
-22	43	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-15	35	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-47	325	8136674875944288	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-23	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-57	3183	8136675047999672	FrSky_2_HoTT.elf	1631f53b81c4f35a
-15	37	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-50	334	8136676120128056	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-334	3527	8136676122646875	FrSky_2_HoTT.elf	1631f53b81c4f35a
-19	42	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-14	35	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-47	318	8136682391303723	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-26	52	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-14	36	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-14	35	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-14	35	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-47	346	8136687569200321	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-346	3506	8136687571739025	FrSky_2_HoTT.elf	1631f53b81c4f35a
-22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-56	320	8136688079763952	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-321	3561	8136688082661056	FrSky_2_HoTT.elf	1631f53b81c4f35a
-22	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-14	35	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-48	317	8136690648134115	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-20	41	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-15	36	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-48	313	8136691593790611	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-18	43	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-18	43	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-56	362	8136696715123933	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-363	3596	8136696717720887	FrSky_2_HoTT.elf	1631f53b81c4f35a
-24	48	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-15	37	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-49	357	8136699911569035	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-357	3528	8136699914402520	FrSky_2_HoTT.elf	1631f53b81c4f35a
-22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-56	336	8136701236162434	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-336	3523	8136701238875475	FrSky_2_HoTT.elf	1631f53b81c4f35a
-27	53	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-13	34	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-15	37	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-49	355	8136705048617357	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-356	3579	8136705051409451	FrSky_2_HoTT.elf	1631f53b81c4f35a
-22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-56	346	8136706452279956	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-346	3546	8136706455148393	FrSky_2_HoTT.elf	1631f53b81c4f35a
-22	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-58	372	8136711414194832	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-373	3563	8136711417073792	FrSky_2_HoTT.elf	1631f53b81c4f35a
-21	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-56	349	8136713221344497	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-349	3520	8136713223994852	FrSky_2_HoTT.elf	1631f53b81c4f35a
-22	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-58	356	8136714977100983	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-356	3571	8136714979817741	FrSky_2_HoTT.elf	1631f53b81c4f35a
-29	56	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-69	367	8136716349394129	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-367	3590	8136716352154241	FrSky_2_HoTT.elf	1631f53b81c4f35a
-20	42	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-54	349	8136717347012413	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-349	3549	8136717349713235	FrSky_2_HoTT.elf	1631f53b81c4f35a
-20	42	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-54	352	8136719241909129	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-353	3569	8136719244694782	FrSky_2_HoTT.elf	1631f53b81c4f35a
-20	42	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-55	358	8136729510859804	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-359	3581	8136729513737172	FrSky_2_HoTT.elf	1631f53b81c4f35a
-28	56	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-68	369	8136732358053154	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-370	3562	8136732360768788	FrSky_2_HoTT.elf	1631f53b81c4f35a
-27	57	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-72	410	8136737571246783	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
-81	641	8136737573569969	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
 641	3932	8136737576113667	FrSky_2_HoTT.elf	1631f53b81c4f35a
+33	64	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+85	1208	8136941228986405	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+1209	5530	8136941241525099	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	47	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+59	314	8136944004932174	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+314	3548	8136944007521401	FrSky_2_HoTT.elf	1631f53b81c4f35a
+23	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+58	327	8136944789736174	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+327	3508	8136944792543290	FrSky_2_HoTT.elf	1631f53b81c4f35a
+21	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+56	312	8136949196674073	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+313	3549	8136949199371199	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+57	320	8136952122022419	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+320	3525	8136952124794013	FrSky_2_HoTT.elf	1631f53b81c4f35a
+23	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+57	321	8136955694764856	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+322	3526	8136955697549877	FrSky_2_HoTT.elf	1631f53b81c4f35a
+24	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+59	314	8136957201557083	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+314	3517	8136957204223375	FrSky_2_HoTT.elf	1631f53b81c4f35a
+23	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+57	305	8136958231033999	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+305	3522	8136958233715051	FrSky_2_HoTT.elf	1631f53b81c4f35a
+23	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+58	376	8136965272609045	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+376	3640	8136965275231998	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+57	358	8136965924684240	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+359	3612	8136965927483020	FrSky_2_HoTT.elf	1631f53b81c4f35a
+25	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+22	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+14	36	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+49	353	8136968881064739	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+353	3575	8136968883818821	FrSky_2_HoTT.elf	1631f53b81c4f35a
+21	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+56	373	8136970582190974	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+374	3613	8136970584893826	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+56	366	8136971555523326	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+366	3576	8136971558133144	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+56	404	8136972394929345	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+405	3641	8136972397733194	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+58	370	8136973999830388	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+370	3666	8136974002923553	FrSky_2_HoTT.elf	1631f53b81c4f35a
+21	43	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+55	362	8136974701426945	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+363	3573	8136974704241704	FrSky_2_HoTT.elf	1631f53b81c4f35a
+24	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+60	345	8136977723853795	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+345	3625	8136977726717420	FrSky_2_HoTT.elf	1631f53b81c4f35a
+25	49	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+15	41	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+56	324	8136980579461506	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+325	3538	8136980582346149	FrSky_2_HoTT.elf	1631f53b81c4f35a
+23	50	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+65	332	8136984577714893	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+332	3554	8136984580473675	FrSky_2_HoTT.elf	1631f53b81c4f35a
+28	52	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+65	322	8136985571307390	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+322	3561	8136985574289372	FrSky_2_HoTT.elf	1631f53b81c4f35a
+21	43	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+55	307	8136988624264259	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+308	3568	8136988627245713	FrSky_2_HoTT.elf	1631f53b81c4f35a
+23	47	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+59	316	8136993551558855	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+316	3537	8136993554226441	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+58	328	8136995217061049	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+22	42	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+55	3225	8136995390845326	FrSky_2_HoTT.elf	1631f53b81c4f35a
+15	36	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+49	302	8136997774114538	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+303	3570	8136997776977654	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+15	37	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+49	354	8137003577455885	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+355	3634	8137003580068360	FrSky_2_HoTT.elf	1631f53b81c4f35a
+35	65	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+77	1951	8137009519619967	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+1951	6640	8137009536316213	FrSky_2_HoTT.elf	1631f53b81c4f35a
+24	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+59	367	8137013715250771	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+367	3618	8137013718013053	FrSky_2_HoTT.elf	1631f53b81c4f35a
+21	43	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+56	377	8137014497179196	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+378	3649	8137014499837732	FrSky_2_HoTT.elf	1631f53b81c4f35a
+24	46	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+58	375	8137021557676832	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+375	3604	8137021560305518	FrSky_2_HoTT.elf	1631f53b81c4f35a
+22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+56	388	8137023372753013	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+388	3669	8137023375584142	FrSky_2_HoTT.elf	1631f53b81c4f35a
+24	45	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+59	382	8137027060166391	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
