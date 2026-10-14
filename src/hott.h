@@ -190,6 +190,38 @@ typedef struct {
   uint8_t chksum;                  /* Byte 45: Parity Byte */
 } __attribute__((__packed__)) HOTT_GPS_MSG ;
 
+typedef struct {
+  uint8_t startByte;               /* Byte 1: 0x7C = Start byte data */
+  uint8_t sensorID;                /* Byte 2: 0x89 = Vario Sensor */
+  uint8_t alarmTone;               /* Byte 3: 0…= warning beeps */
+  uint8_t sensorTextID;            /* Byte 4: 144 = 0x90 Vario Sensor ID Neu! */
+  uint8_t alarmInverse1;           /* Byte 5: 00 inverse status */
+  uint8_t alarmInverse2;           /* Byte 6: 00 inverse status */
+  
+  uint8_t altitudeLow;             /* Byte 7:  Altitude low byte (500 = 0m) */
+  uint8_t altitudeHigh;            /* Byte 8:  Altitude high byte */
+  uint8_t maxAltitudeLow;          /* Byte 9:  Max Altitude low byte */
+  uint8_t maxAltitudeHigh;         /* Byte 10: Max Altitude high byte */
+  uint8_t minAltitudeLow;          /* Byte 11: Min Altitude low byte */
+  uint8_t minAltitudeHigh;         /* Byte 12: Min Altitude high byte */
+  
+  uint8_t m_secLow;                /* Byte 13: m/s resolution 0.01m (30000 = 0.00m/s) */
+  uint8_t m_secHigh;               /* Byte 14: m/s resolution high byte */
+  uint8_t m_1secLow;               /* Byte 15: m/1s resolution low byte */
+  uint8_t m_1secHigh;              /* Byte 16: m/1s resolution high byte */
+  uint8_t m_3secLow;               /* Byte 17: m/3s resolution low byte */
+  uint8_t m_3secHigh;              /* Byte 18: m/3s resolution high byte */
+  uint8_t m_10secLow;              /* Byte 19: m/10s resolution low byte */
+  uint8_t m_10secHigh;             /* Byte 20: m/10s resolution high byte */
+  
+  uint8_t AsciiText[21];           /* Byte 21..41: Text für das Text-Display */
+  uint8_t version;                 /* Byte 42: 00 version number */
+  uint8_t endByte;                 /* Byte 43: 0x7D Ende byte */
+  uint8_t chksum;                  /* Byte 44: Parity Byte */
+} __attribute__((__packed__)) HOTT_VARIO_MSG ;
+
+
+
 uint8_t warning_beeps_Hott(void);
 
 
@@ -204,6 +236,8 @@ bool sendHottFrame(uint8_t data);  // generate the frame GAM or GPS according to
 bool fillHottGamFrame(); // fill a GAM frame ; return true if a frame is filled
 
 bool fillHottGpsFrame() ; // fill a GAM frame ; return true if a frame is filled
+
+bool fillHottVarioFrame() ; // fill a Vario frame ; return true if a frame is filled
 
 void convertLonLat_Hott( int32_t GPS_LatLon, uint16_t  * degMin , uint16_t * decimalMin ) ;
 

@@ -1,9 +1,9 @@
 #pragma once
 
 #include <stdint.h>
-#define VERSION "3.5.0"
+#define VERSION "3.6.0"
 
-#define DEBUG  // force the MCU to wait for some time for the USB connection; still continue if not connected
+//#define DEBUG  // force the MCU to wait for some time for the USB connection; still continue if not connected
 
 //#define DEBUGINAV
 // Here some additional parameters that can't be changed via the serial terminal 
@@ -362,29 +362,79 @@
 #define _pinHigh 255;   // force a level High on this pin (when defined between 0 and 29)
 #define _pinLow 255;   // force a level Low on this pin (when defined between 0 and 29)
 
-/*
-// Jeti EX Protocoll
-#define _pinPrimIn  0X09
-#define _pinTlm  0XFF
-#define _inav_ltm  1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
-#define _protocol  'E' // E = Jeti EX
-// -------------------------------
+// =================================================================
+// ZENTRALE AUSWAHL: Hier das gewünschte Protokoll eintragen (1, 2, 3 oder 4)
+// =================================================================
 
 
-// Multiplex Protocoll
-#define _pinPrimIn  0XFF
-#define _pinTlm  0X00
-#define _inav_ltm  1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
-#define _protocol  'M' // M = Multiplex
-// -------------------------------
-*/
+#define PROTO_SELECT  4
 
- // Hott Protocoll
-#define _pinPrimIn  0XFF
-#define _pinTlm  0X00
-#define _inav_ltm  1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
-#define _protocol  'H' // H = Hott
-// -------------------------------
+
+// 1 = ltm to Jeti EX Protocoll
+// 2 = ltm to Multiplex Protocoll
+// 3 = ltm to Hott Protocoll
+// 4 = frsky to HottProtocoll
+
+// =================================================================
+
+#if (PROTO_SELECT == 1)
+    // ltm to Jeti EX Protocoll
+    #define _pinPrimIn  0X09
+    #define _pinTlm     0XFF
+    #define _inav_ltm   1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
+    #define _protocol   'E'           // E = Jeti EX
+
+#elif (PROTO_SELECT == 2)
+    // ltm to Multiplex Protocoll
+    #define _pinPrimIn  0XFF
+    #define _pinTlm     0X00
+    #define _inav_ltm   1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
+    #define _protocol   'M'           // M = Multiplex
+
+#elif (PROTO_SELECT == 3)
+    // ltm to Hott Protocoll
+    #define _pinPrimIn  0XFF
+    #define _pinTlm     0X00
+    #define _inav_ltm   1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
+    #define _protocol   'H'           // H = Hott
+
+#elif (PROTO_SELECT == 4)
+    // frsky to Hott Protocoll
+    #define _pinPrimIn  0XFF
+    #define _pinTlm     0X00
+    #define _inav_ltm   3             // 3 = FRSKY Protokoll, 2 = Testausgabe...
+    #define _protocol   'H'           // H = Hott
+
+#elif (PROTO_SELECT == 5)
+    // frsky to csrf Protocoll
+    #define _pinPrimIn  0XFF
+    #define _pinTlm     0X00
+    #define _inav_ltm   3             // 3 = FRSKY Protokoll, 2 = Testausgabe...
+    #define _protocol   'C'           // C = csrf
+
+#elif (PROTO_SELECT == 6)
+    // frsky to Multiplex Protocoll
+    #define _pinPrimIn  0XFF
+    #define _pinTlm     0X00
+    #define _inav_ltm   3             // 3 = FRSKY Protokoll, 2 = Testausgabe...
+    #define _protocol   'M'           // M = Multiplex
+    
+#elif (PROTO_SELECT == 7)
+    // ltm to Jeti EX Protocoll
+    #define _pinPrimIn  0X09
+    #define _pinTlm     0XFF
+    #define _inav_ltm   3             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
+    #define _protocol   'E'           // E = Jeti EX    
+
+#else
+    #error "Ungültige Auswahl für PROTO_SELECT! Bitte eine Zahl von 1 bis 4 wählen."
+#endif
+
+// FRSKY S.PORT MASTER INPUT CONFIGURATION
+#define PIN_FRSKY_IN 5            // Wir nutzen GP5 für den Eingang
+#define FRSKY_UART   uart1        // GP5 gehört hardwareseitig zu uart1
+#define FRSKY_BAUDRATE 57600
+
 
 
 #define _gyroChanControl 0xFF // Rc channel used to say if gyro is implemented or not and to select the mode and the general gain. Value must be in range 1/16 or 255 (no gyro)

@@ -1,4 +1,6 @@
 #include "pico/stdlib.h"
+
+
 #include "stdio.h"
 #include "config.h"
 #include "hardware/i2c.h"
@@ -49,6 +51,11 @@
 #include "sx126x_driver.h"
 #include "kx134.h"
 #include "frsky_hub.h"
+#include "uart_frsky_master.pio.h" // 🟢 Baut die Brücke zu den mstrens-PIO-Befehlen!
+#include "inav_frsky.h"  // 🟢 KORREKTUR: Macht handleMultiProtocol_N in der main.cpp bekannt
+#include "inav_ltm.h" // Einbinden des LTM-Parsers für iNav
+
+
 
 // to do : add rpm, temp telemetry fields to jeti protocol
 //         try to detect MS5611 and other I2C testing the different I2C addresses
@@ -120,11 +127,67 @@
 // - manage the button and led
 
 
+static int search_idx = 0;       
+static int scheduler_step = 0;    
+static uint32_t next_send_time_us = 0;
+static uint32_t pin_listen_time_us = 0;
+static bool pin_is_listening = false;
+
+// Dynamische Registry für den Turbo-Takt
+#define MAX_ACTIVE_SENSORS 10
+static uint8_t active_sensors[MAX_ACTIVE_SENSORS];       
+static uint32_t last_seen_ms[MAX_ACTIVE_SENSORS];        
+static int active_sensors_count = 0;                     
+static int class_b_rotation_idx = 0;                     
+
+// Lokaler Zwischenspeicher für Empfangsbytes
+static uint8_t local_rx_buf[30];
+static int local_rx_idx = 0;
+
+// 🟢 DIE OFFIZIELLE FR-SKY TELEMETRIE-LISTE (Nach Pawelsky)
+static const uint8_t s_port_search_ids[] = {
+    0x00, // ID1:  Variometer (Höhe / Steigen - Hauptadresse)
+    0xA1, // ID2:  FLVS (Lipo-Einzelzellen-Spannungssensor)
+    0x22, // ID3:  FAS (Klassischer Strom- und Spannungssensor)
+    0x83, // ID4:  GPS-Empfänger (Breitengrad, Längengrad, Satelliten)
+    0xE4, // ID5:  RPM / TEMPERATUR (Drehzahl und Motortemperatur)
+    0x45, // ID6:  Airspeed (Staudruck-Geschwindigkeitsmesser)
+    0xC6, // ID7:  Variometer (Alternative Zweitadresse)
+    0x67, // ID8:  Sensor Hub (Verteilerbox für Zusatzsensoren)
+    0x48, // ID9:  Frei / Universeller Zusatzsensor 1
+    0xE9, // ID10: Frei / Universeller Zusatzsensor 2
+    0x6A, // ID11: Frei / Universeller Zusatzsensor 3
+    0xCB, // ID12: Frei / Universeller Zusatzsensor 4
+    0xAC, // ID13: Frei / Universeller Zusatzsensor 5
+    0x0D, // ID14: Frei / Universeller Zusatzsensor 6
+    0x8E, // ID15: Frei / Universeller Zusatzsensor 7
+    0x2F, // ID16: UniSens-E Standard-Adresse (Volt, Strom, Kapazität, RPM)
+    0xD0, // ID17: Frei / Universeller Zusatzsensor 8
+    0x71, // ID18: Frei / Universeller Zusatzsensor 9
+    0xF2, // ID19: Frei / Universeller Zusatzsensor 10
+    0x53, // ID20: Redundanz-Empfänger / Wechselschalter (RB-20/40 Block 1)
+    0x34, // ID21: Redundanz-Empfänger / Wechselschalter (RB-20/40 Block 2)
+    0x95, // ID22: Frei / Universeller Zusatzsensor 11
+    0x16, // ID23: Frei / Universeller Zusatzsensor 12
+    0xB7, // ID24: Frei / Universeller Zusatzsensor 13
+    0x98, // ID25: Frei / Universeller Zusatzsensor 14
+    0x39, // ID26: Frei / Universeller Zusatzsensor 15
+    0xBA, // ID27: Frei / Universeller Zusatzsensor 16
+    0x1B  // ID28: iNav Flight Controller (FCS kombiniert / Spannung, Strom, GPS)
+};
+
+
+
+extern queue_t fbusRxQueue; // Sagt dem Compiler, dass die Queue existiert
+extern void handleMultiProtocol_N(uint8_t b); // 🟢 KORREKTUR: Zwingt den Compiler, die Funktion zu kennen
+extern void read_frsky_sensors_core1(void); // 🟢 KORREKTUR: Zwingt den Compiler, die Funktion zu kennen
+
 void getSensors_ltm(void); // Funktions-Prototyp bekannt machen
 
 
-// Einbinden des LTM-Parsers für iNav
-#include "inav_ltm.h"
+// Globales Lipo-Array für die Einzelzellen (Einheit: Millivolt)
+//extern uint16_t hott_custom_cells[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+//extern bool has_hott_custom_cells = false;
 
 VOLTAGE voltage ;    // class to handle voltages
 
@@ -203,6 +266,15 @@ int16_t gyroZ;
 
 extern bool calibrateImuGyro ; // recalibrate the gyro or not at reset (avoid it after a watchdog reset)
 
+#define LED_PIN           25 // 25 ist Standard beim Pico. Bei Bedarf anpassen!
+
+#include "pico/util/queue.h"
+
+
+
+// Wir nutzen die von mstrens initialisierte Rx-Queue
+extern queue_t fbusRxQueue; 
+
 void setupI2c(){
     if ( config.pinScl == 255 || config.pinSda == 255) return; // skip if pins are not defined
     // send 10 SCL clock to force sensor to release sda
@@ -243,6 +315,33 @@ void setupI2c(){
     gpio_set_function(config.pinScl, GPIO_FUNC_I2C);
     gpio_pull_up(config.pinSda);
     gpio_pull_up(config.pinScl); 
+}
+
+void setColorState(){    // set the colors based on the RF link
+    lastBlinkMillis = millisRp(); // reset the timestamp for blinking
+    switch (ledState) {
+        case STATE_OK:
+            setRgbColorOn(0, 10, 0); //green
+            break;
+        case STATE_PARTLY_OK:
+            setRgbColorOn(10, 5, 0); //yellow
+            break;
+        case STATE_FAILSAFE:
+            setRgbColorOn(0, 0, 10); //blue
+            break;
+        case STATE_GYRO_CAL_MIXER_NOT_DONE:
+            setRgbColorOn(10, 0, 0); //red
+            break;
+        case STATE_GYRO_CAL_MIXER_DONE:
+            setRgbColorOn(10, 5, 0); //yellow
+            break;
+        case STATE_GYRO_CAL_LIMIT:
+            setRgbColorOn(0, 0, 10); //blue
+            break;
+        default:
+            setRgbColorOn(10, 0, 0); //red
+            break;     
+    }
 }
 
 void setupSensors(){     // this runs on core1!!!!!!!!
@@ -296,116 +395,6 @@ void setupSensors(){     // this runs on core1!!!!!!!!
       //printf("end core1 setup\n") ;    
       //getTimerUs(0);   // xxxxx
 }
-
-
-void getSensors_O(void){      // this runs on core1 !!!!!!!!!!!!
-  voltage.getVoltages();
-  if ( baro1.baroInstalled){
-    if ( baro1.getAltitude() == 0) { // if an altitude is calculated
-      vario1.calculateAltVspeed(baro1.altitudeCm , baro1.altIntervalMicros ); // Then calculate Vspeed ...   
-    }
-  } else if ( baro2.baroInstalled){
-    if ( baro2.getAltitude() == 0) { // if an altitude is calculated
-      vario1.calculateAltVspeed(baro2.altitudeCm , baro2.altIntervalMicros); // Then calculate Vspeed ... 
-    }
-  } else if (baro3.baroInstalled) {
-    if ( baro3.getAltitude() == 0) { // if an altitude is calculated
-      vario1.calculateAltVspeed(baro3.altitudeCm , baro3.altIntervalMicros); // Then calculate Vspeed ... 
-    }
-  }
-  adc1.readSensor(); 
-  adc2.readSensor();
-  mpu.getAccZWorld();
-  #ifdef KX134_IS_USED
-  kx134.getAcc();
-  #endif  
-  gps.readGps();
-  if (ms4525.airspeedInstalled){
-    ms4525.getDifPressure();
-    calculateAirspeed( );
-    vario1.calculateVspeedDte();
-  }
-  if (sdp3x.airspeedInstalled){
-    sdp3x.getDifPressure();
-    calculateAirspeed( );
-    vario1.calculateVspeedDte();
-  }
-  if (xgzp.airspeedInstalled){
-    xgzp.getDifPressure();
-    calculateAirspeed( );
-    vario1.calculateVspeedDte();
-  }
-  readRpm();
-  handleEsc();
-  #ifdef USE_DS18B20
-  ds18b20Read(); 
-  #endif
-  //calculate AoA based on Vspeed, 2d ground speed and pitch
-  
-  if (fields[VSPEED].onceAvailable && fields[GROUNDSPEED].onceAvailable && fields[PITCH].onceAvailable){
-    float aoa = (float) fields[PITCH].value -  atan2f((float) fields[VSPEED].value, (float) fields[GROUNDSPEED].value) * 180.0 / 3.1416; 
-    sent2Core0( RESERVE5 , (int32_t) aoa) ;
-  }
-}
-
-// read and update all sensor values (runs on core 1)
-void getSensors_V1(void){                                                          // this runs on core1
-  voltage.getVoltages();                                                         // read voltage sensors
-  if ( baro1.baroInstalled){                                                    // check if baro 1 is present
-    if ( baro1.getAltitude() == 0) {                                            // calculate altitude for baro 1
-      vario1.calculateAltVspeed(baro1.altitudeCm , baro1.altIntervalMicros );   // calculate vspeed
-    }
-  } else if ( baro2.baroInstalled){                                             // check if baro 2 is present
-    if ( baro2.getAltitude() == 0) {                                            // calculate altitude for baro 2
-      vario1.calculateAltVspeed(baro2.altitudeCm , baro2.altIntervalMicros);   // calculate vspeed
-    }
-  } else if (baro3.baroInstalled) {                                             // check if baro 3 is present
-    if ( baro3.getAltitude() == 0) {                                            // calculate altitude for baro 3
-      vario1.calculateAltVspeed(baro3.altitudeCm , baro3.altIntervalMicros);   // calculate vspeed
-    }
-  }
-  adc1.readSensor();                                                            // read analog sensor 1
-  adc2.readSensor();                                                            // read analog sensor 2
-  mpu.getAccZWorld();                                                           // read mpu acc Z
-  #ifdef KX134_IS_USED
-  kx134.getAcc();                                                               // read kx134 acc
-  #endif  
-  
-if (config.inav_ltm == 1) {						// Prüft ob iNav LTM aktiviert ist
-		parse_inav_ltm();							// LTM-Parser liest direkt von INAV_UART
-	} else {
-		gps.readGps();								// Alternativer Standard GPS-Parser
-	}
-
-
-  if (ms4525.airspeedInstalled){                                                // check MS4525 airspeed sensor
-    ms4525.getDifPressure();                                                    // read differential pressure
-    calculateAirspeed( );                                                       // calculate airspeed
-    vario1.calculateVspeedDte();                                                // calculate DTE vspeed
-  }
-  if (sdp3x.airspeedInstalled){                                                 // check SDP3X airspeed sensor
-    sdp3x.getDifPressure();                                                     // read differential pressure
-    calculateAirspeed( );                                                       // calculate airspeed
-    vario1.calculateVspeedDte();                                                // calculate DTE vspeed
-  }
-  if (xgzp.airspeedInstalled){                                                  // check XGZP airspeed sensor
-    xgzp.getDifPressure();                                                      // read differential pressure
-    calculateAirspeed( );                                                       // calculate airspeed
-    vario1.calculateVspeedDte();                                                // calculate DTE vspeed
-  }
-  readRpm();                                                                    // read RPM sensor
-  handleEsc();                                                                  // process ESC telemetry
-  #ifdef USE_DS18B20
-  ds18b20Read();                                                                // read DS18B20 temperature sensor
-  #endif
-  
-  if (fields[VSPEED].onceAvailable && fields[GROUNDSPEED].onceAvailable && fields[PITCH].onceAvailable){ // check required fields for AoA
-    float aoa = (float) fields[PITCH].value -  atan2f((float) fields[VSPEED].value, (float) fields[GROUNDSPEED].value) * 180.0 / 3.1416; // calculate AoA
-    sent2Core0( RESERVE5 , (int32_t) aoa) ;                                     // send AoA result to core 0
-  }
-}
-
-
 
 // read and update all sensor values (runs on core 1)		
 void getSensors(void){                                                          // this runs on core1
@@ -466,342 +455,6 @@ void getSensors(void){                                                          
 }
 
 
-
-
-void getSensors_ltm_O(void) {
-    // ECHTE PICO-LED INITIALISIERUNG
-    static bool ledInit = false;
-    if (!ledInit) {
-        gpio_init(25);
-        gpio_set_dir(25, GPIO_OUT);
-        ledInit = true;
-    }
-
-    // =================================================================
-    // SCHRITT 1: DIE WERTE HOLEN
-    // =================================================================
-    if (config.inav_ltm == 1) {
-        // Unzerstörbare Speicher-Schubladen auf Core 0, um die Live-Werte einzufrieren
-        static int32_t live_alt = 100; // Startwert 1 Meter für HoTT-Init
-        static int32_t live_mvolt = 0;
-        static int32_t live_current = 0;
-        static int32_t live_speed = 0;
-        static int32_t live_sat = 0;
-        static int32_t live_rpm = 0;
-        static int32_t live_cap = 0;
-        static int32_t live_pitch = 0;
-        static int32_t live_roll = 0;
-        static int32_t live_heading = 0;
-
-        // Flags, ob wir von iNav überhaupt schon mal ein Paket empfangen haben
-        static bool has_alt = false;
-        static bool has_mvolt = false;
-        static bool has_current = false;
-        static bool has_speed = false;
-        static bool has_sat = false;
-        static bool has_rpm = false;
-        static bool has_cap = false;
-
-        // Wir merken uns, ob vor dem Aufruf neue Daten da waren
-        bool altWasAvailable = fields[ALTITUDE].available;
-        bool voltWasAvailable = fields[MVOLT].available;
-
-        // Der Parser läuft direkt auf Core 0 und bebefüllt die fields[] kurzzeitig live!
-        parse_inav_ltm(); 
-
-        // WERT-SICHERUNG: Sobald der LTM-Parser ein neues Datenfeld meldet, 
-        // frieren wir es sofort in unseren geschützten static-Schubladen ein!
-        if (fields[ALTITUDE].available)    { live_alt = fields[ALTITUDE].value; has_alt = true; }
-        if (fields[MVOLT].available)       { live_mvolt = fields[MVOLT].value; has_mvolt = true; }
-        if (fields[CURRENT].available)     { live_current = fields[CURRENT].value; has_current = true; }
-        if (fields[GROUNDSPEED].available) { live_speed = fields[GROUNDSPEED].value; has_speed = true; }
-        if (fields[NUMSAT].available)      { live_sat = fields[NUMSAT].value; has_sat = true; }
-        if (fields[RPM].available)         { live_rpm = fields[RPM].value; has_rpm = true; }
-        if (fields[CAPACITY].available)    { live_cap = fields[CAPACITY].value; has_cap = true; }
-        if (fields[PITCH].available)       { live_pitch = fields[PITCH].value; }
-        if (fields[ROLL].available)        { live_roll = fields[ROLL].value; }
-        if (fields[HEADING].available)     { live_heading = fields[HEADING].value; }
-
-        // Jetzt spiegeln wir die eingefrorenen Live-Werte dauerhaft zurück in die aktiven fields,
-        // damit sie für Core 0 exakt wie in Modus 2 als DAUERFEUER bereitstehen!
-        fields[ALTITUDE].value = live_alt;       
-        if (has_mvolt)   { fields[MVOLT].value = live_mvolt; }
-        if (has_current) { fields[CURRENT].value = live_current; }
-        if (has_speed)   { fields[GROUNDSPEED].value = live_speed; }
-        if (has_sat)     { fields[NUMSAT].value = live_sat; }
-        if (has_rpm)     { fields[RPM].value = live_rpm; }
-        if (has_cap)     { fields[CAPACITY].value = live_cap; }
-        
-        fields[PITCH].value = live_pitch;     
-        fields[ROLL].value = live_roll;       
-        fields[HEADING].value = live_heading; 
-
-        // SMART-LED FÜR DEN LIVEFLUG:
-        // Wenn in diesem Durchlauf kein neues Paket ankam, blinkt sie ruhig.
-        // Sobald echte Daten fließen, flackert sie hektisch im Takt der Bytes!
-        if (fields[ALTITUDE].available == altWasAvailable && fields[MVOLT].available == voltWasAvailable) {
-            gpio_put(25, (millisRp() % 1000 < 500)); 
-        } else {
-            gpio_put(25, (millisRp() % 60 < 30)); 
-        }
-    } 
-    else if (config.inav_ltm == 2) {
-        // Tischtest-Modus bleibt absolut UNVERÄNDERT!
-
-        fields[ALTITUDE].value     = 15000;    
-        fields[MVOLT].value        = 12400;    
-        fields[CURRENT].value      = 1500;     
-        fields[GROUNDSPEED].value  = 4500;     
-        fields[NUMSAT].value       = 9;        
-        fields[RPM].value          = 3200;     
-        fields[PITCH].value        = 10;       
-        fields[ROLL].value         = 5;        
-        fields[HEADING].value      = 180;      
-        fields[CAPACITY].value     = 850;      
-    }
-
-    // =================================================================
-    // SCHRITT 2: DAS DAUERFEUER DER FLAGS ERZWINGEN (Am Ende der Funktion!)
-    // Wir knallen die Ampeln im iNav-Modus in JEDEM Loop-Durchlauf auf true,
-    // damit der oXs-Reiniger am Schleifenende absolut keine Chance mehr hat!
-    // =================================================================
-    fields[ALTITUDE].available    = true; 
-    fields[MVOLT].available       = true;
-    fields[CURRENT].available     = true; 
-    fields[GROUNDSPEED].available = true;
-    fields[NUMSAT].available      = true; 
-    fields[RPM].available         = true;
-    fields[PITCH].available       = true; 
-    fields[ROLL].available        = true;
-    fields[HEADING].available     = true; 
-    fields[CAPACITY].available    = true;
-    
-    // Vario-Berechnung synchron halten
-    vario1.calculateAltVspeed(fields[ALTITUDE].value, 200000);
-    fields[VSPEED].available = true;
-
-    // HoTT-Pflichtfeld-Spiegelung für das GAM-Modul
-    fields[RELATIVEALT].value     = fields[ALTITUDE].value;
-    fields[RELATIVEALT].available = true;
-    fields[RESERVE2].value        = fields[MVOLT].value;
-    fields[RESERVE2].available    = true;
-
-    // HOTT-START-TRIGGER: Gaukelt ein aktives Vario vor, um die IDs anzumelden
-    fields[VSPEED].value = 0;
-    fields[VSPEED].available = true;
-    fields[VSPEED].onceAvailable = true; 
-
-    // =================================================================
-    // SCHRITT 3: DIE SMART-LED FÜR DEN PRAXISBETRIEB STEUERN
-    // =================================================================
-    if (config.inav_ltm == 2) {
-        gpio_put(25, 1); // Tischtest läuft -> LED leuchtet dauerhaft grün
-    } else if (config.inav_ltm == 1) {
-        // Im Liveflug lassen wir sie im Rhythmus der ankommenden Bytes blinken
-        gpio_put(25, (millisRp() % 200 < 100)); 
-    }
-}
-
-void getSensors_ltm(void) {
-    // ECHTE PICO-LED INITIALISIERUNG
-    static bool ledInit = false;
-    if (!ledInit) {
-        gpio_init(25);
-        gpio_set_dir(25, GPIO_OUT);
-        ledInit = true;
-    }
-
-    // =================================================================
-    // SCHRITT 1: DIE WERTE HOLEN
-    // =================================================================
-    if (config.inav_ltm == 1) {
-        // SYSTEMATISCH: Das Wort 'static' und der Typ 'int32_t' / 'bool' fallen hier weg,
-        // weil wir direkt die globalen Variablen vom Dateikopf verwenden!
-        // Wir setzen hier im Live-Betrieb nur die Startwerte zurück.
-        live_alt = 100; 
-        live_mvolt = 0;
-        live_current = 0;
-        live_speed = 0;
-        live_sat = 0;
-        live_rpm = 0;
-        live_cap = 0;
-        live_pitch = 0;
-        live_roll = 0;
-        live_heading = 0;
-
-        has_alt = false;
-        has_mvolt = false;
-        has_current = false;
-        has_speed = false;
-        has_sat = false;
-        has_rpm = false;
-        has_cap = false;
-
-        // Wir merken uns, ob vor dem Aufruf neue Daten da waren
-        bool altWasAvailable = fields[ALTITUDE].available;
-        bool voltWasAvailable = fields[MVOLT].available;
-
-        // Der Parser läuft direkt auf Core 0 und befüllt die fields[] kurzzeitig live!
-        parse_inav_ltm(); 
-
-        // WERT-SICHERUNG: Sobald der LTM-Parser ein neues Datenfeld meldet, 
-        // frieren wir es sofort in unseren globalen Schubladen ein!
-        if (fields[ALTITUDE].available)    { live_alt = fields[ALTITUDE].value; has_alt = true; }
-        if (fields[MVOLT].available)       { live_mvolt = fields[MVOLT].value; has_mvolt = true; }
-        if (fields[CURRENT].available)     { live_current = fields[CURRENT].value; has_current = true; }
-        if (fields[GROUNDSPEED].available) { live_speed = fields[GROUNDSPEED].value; has_speed = true; }
-        if (fields[NUMSAT].available)      { live_sat = fields[NUMSAT].value; has_sat = true; }
-        if (fields[RPM].available)         { live_rpm = fields[RPM].value; has_rpm = true; }
-        if (fields[CAPACITY].available)    { live_cap = fields[CAPACITY].value; has_cap = true; }
-        if (fields[PITCH].available)       { live_pitch = fields[PITCH].value; }
-        if (fields[ROLL].available)        { live_roll = fields[ROLL].value; }
-        if (fields[HEADING].available)     { live_heading = fields[HEADING].value; }
-        if (fields[TEMP1].available)        { live_flight_mode = fields[TEMP1].value; }
-        if (fields[TEMP2].available)        { live_is_armed = fields[TEMP2].value; }
-
-        // Jetzt spiegeln wir die eingefrorenen Live-Werte dauerhaft zurück in die aktiven fields,
-        // damit sie für Core 0 exakt wie in Modus 2 als DAUERFEUER bereitstehen!
-        fields[ALTITUDE].value = live_alt;       
-        if (has_mvolt)   { fields[MVOLT].value = live_mvolt; }
-        if (has_current) { fields[CURRENT].value = live_current; }
-        if (has_speed)   { fields[GROUNDSPEED].value = live_speed; }
-        if (has_sat)     { fields[NUMSAT].value = live_sat; }
-        if (has_rpm)     { fields[RPM].value = live_rpm; }
-        if (has_cap)     { fields[CAPACITY].value = live_cap; }
-        
-        fields[PITCH].value = live_pitch;     
-        fields[ROLL].value = live_roll;       
-        fields[HEADING].value = live_heading; 
-
-        // SMART-LED FÜR DEN LIVEFLUG:
-        // Wenn in diesem Durchlauf kein neues Paket ankam, blinkt sie ruhig.
-        // Sobald echte Daten fließen, flackert sie hektisch im Takt der Bytes!
-        if (fields[ALTITUDE].available == altWasAvailable && fields[MVOLT].available == voltWasAvailable) {
-            gpio_put(25, (millisRp() % 1000 < 500)); 
-        } else {
-            gpio_put(25, (millisRp() % 60 < 30)); 
-        }
-    } 
-    else if (config.inav_ltm == 2) {
-        // Tischtest-Modus befüllt ebenfalls die globalen Variablen für Jeti mit!
-        live_alt     = 15000;    
-        live_mvolt    = 12400;    
-        live_current  = 1500;     
-        live_speed    = 4500;     
-        live_sat      = 9;        
-        live_rpm      = 3200;     
-        live_pitch    = 10;       
-        live_roll     = 5;        
-        live_heading  = 180;      
-        live_cap      = 850;  
-        live_flight_mode = 13;
-        live_is_armed    = 1;
-
-        fields[ALTITUDE].value     = live_alt;    
-        fields[MVOLT].value        = live_mvolt;    
-        fields[CURRENT].value      = live_current;     
-        fields[GROUNDSPEED].value  = live_speed;     
-        fields[NUMSAT].value       = live_sat;        
-        fields[RPM].value          = live_rpm;     
-        fields[PITCH].value        = live_pitch;       
-        fields[ROLL].value         = live_roll;        
-        fields[HEADING].value      = live_heading;      
-        fields[CAPACITY].value     = live_cap;      
-        fields[TEMP1].value        = live_flight_mode;
-        fields[TEMP2].value        = live_is_armed;
-
-
-
-    }
-
-    // =================================================================
-    // SCHRITT 2: DAS DAUERFEUER DER FLAGS ERZWINGEN (Am Ende der Funktion!)
-    // Wir knallen die Ampeln im iNav-Modus in JEDEM Loop-Durchlauf auf true,
-    // damit der oXs-Reiniger am Schleifenende absolut keine Chance mehr hat!
-    // =================================================================
-    fields[ALTITUDE].available    = true; 
-    fields[MVOLT].available       = true;
-    fields[CURRENT].available     = true; 
-    fields[GROUNDSPEED].available = true;
-    fields[NUMSAT].available      = true; 
-    fields[RPM].available         = true;
-    fields[PITCH].available       = true; 
-    fields[ROLL].available        = true;
-    fields[HEADING].available     = true; 
-    fields[CAPACITY].available    = true;
-    fields[TEMP1].available       = true; 
-    fields[TEMP2].available       = true;
-
-                // NEU: HIER DIE AMPELN FÜR DAS TERMINAL (FV) DAUERHAFT AUF GRÜN SETZEN!
-    
-        fields[ALTITUDE].onceAvailable    = true;
-        fields[MVOLT].onceAvailable       = true;
-        fields[CURRENT].onceAvailable     = true;
-        fields[GROUNDSPEED].onceAvailable = true;
-        fields[NUMSAT].onceAvailable      = true;
-        fields[PITCH].onceAvailable       = true;
-        fields[ROLL].onceAvailable        = true;
-        fields[HEADING].onceAvailable     = true;
-        fields[CAPACITY].onceAvailable    = true;
-        fields[TEMP1].onceAvailable       = true;
-        fields[TEMP2].onceAvailable       = true;
-    
-    // Vario-Berechnung synchron halten
-    vario1.calculateAltVspeed(fields[ALTITUDE].value, 200000);
-    fields[VSPEED].available = true;
-
-    // HoTT-Pflichtfeld-Spiegelung für das GAM-Modul
-    fields[RELATIVEALT].value     = fields[ALTITUDE].value;
-    fields[RELATIVEALT].available = true;
-    fields[RESERVE2].value        = fields[MVOLT].value;
-    fields[RESERVE2].available    = true;
-
-    // HOTT-START-TRIGGER: Gaukelt ein aktives Vario vor, um die IDs anzumelden
-    fields[VSPEED].value = 0;
-    fields[VSPEED].available = true;
-    fields[VSPEED].onceAvailable = true; 
-
-    // =================================================================
-    // SCHRITT 3: DIE SMART-LED FÜR DEN PRAXISBETRIEB STEUERN
-    // =================================================================
-    if (config.inav_ltm == 2) {
-        gpio_put(25, 1); // Tischtest läuft -> LED leuchtet dauerhaft grün
-    } else if (config.inav_ltm == 1) {
-        // Im Liveflug lassen wir sie im Rhythmus der ankommenden Bytes blinken
-        gpio_put(25, (millisRp() % 200 < 100)); 
-    }
-}
-
-
-
-
-void setColorState(){    // set the colors based on the RF link
-    lastBlinkMillis = millisRp(); // reset the timestamp for blinking
-    switch (ledState) {
-        case STATE_OK:
-            setRgbColorOn(0, 10, 0); //green
-            break;
-        case STATE_PARTLY_OK:
-            setRgbColorOn(10, 5, 0); //yellow
-            break;
-        case STATE_FAILSAFE:
-            setRgbColorOn(0, 0, 10); //blue
-            break;
-        case STATE_GYRO_CAL_MIXER_NOT_DONE:
-            setRgbColorOn(10, 0, 0); //red
-            break;
-        case STATE_GYRO_CAL_MIXER_DONE:
-            setRgbColorOn(10, 5, 0); //yellow
-            break;
-        case STATE_GYRO_CAL_LIMIT:
-            setRgbColorOn(0, 0, 10); //blue
-            break;
-        default:
-            setRgbColorOn(10, 0, 0); //red
-            break;     
-    }
-}
-
 enum bootButtonStates_t {NOT_ARMED, ARMED, SAVED};
 bootButtonStates_t bootButtonState =  NOT_ARMED;
 
@@ -838,290 +491,8 @@ void test_callback(uint alarmNum){
     testU8++;
 }
 
-void setup_o() {
-  stdio_init_all();
-  //bool clockChanged; 
-  //clockChanged = set_sys_clock_khz(133000, false);
-  set_sys_clock_khz(133000, false);
-  #ifdef DEBUG
-  uint16_t counter = 10;                      // after an upload, watchdog_cause_reboot is true.
-  //if ( watchdog_caused_reboot() ) counter = 0; // avoid the UDC wait time when reboot is caused by the watchdog   
-  while ( (!tud_cdc_connected()) && (counter--)) { 
-  //while ( (!tud_cdc_connected()) ) { 
-    sleep_ms(100);
-    //toggleRgb();
-    }
-  sleep_ms(2000);  // in debug mode, wait a little to let USB on PC be able to display all messages
-  uint8_t a1[2] = {1, 2};
-  int debug = 2;
-  debugAX("aa", a1 , 2);
-  #endif
-  
-  if (watchdog_caused_reboot()) {
-        printf("Rebooted by Watchdog!\n");
-        calibrateImuGyro = false;
-    } else {
-        printf("Clean boot\n");
-        calibrateImuGyro = true;
-        //sleep_ms(1000); // wait that GPS is initialized
-    }
-  setupConfig(); // retrieve the config parameters (crsf baudrate, voltage scale & offset, type of gps, failsafe settings)  
-  setupSequencers(); // retrieve the sequencer parameters (defsMax, stepsMax, defs and steps)
-  setupGyroMixer(); 
-  checkConfigAndSequencers();     // check if config and sequencers are valid (print error message; configIsValid is set on true or false)
-  setupLed();
-  setRgbColorOn(0,0,10);  // switch to blue during the setup of different sensors/pio/uart
-  if (configIsValid) { // continue with setup only if config is valid 
-        // force level High / Low on some pins if requested in the config
-        if (config.pinHigh < 30){
-            gpio_init(config.pinHigh);
-            gpio_set_dir(config.pinHigh, GPIO_OUT);
-            gpio_put(config.pinHigh, 1);
-        }
-        if (config.pinLow < 30){
-            gpio_init(config.pinLow);
-            gpio_set_dir(config.pinLow, GPIO_OUT);
-            gpio_put(config.pinLow, 0);
-        }
-      for (uint8_t i = 0 ;  i< NUMBER_MAX_IDX ; i++){ // initialise the list of fields being used 
-        fields[i].value= 0;
-        fields[i].available= false;
-        fields[i].onceAvailable = false;
-      }  
-      queue_init(&qSensorData, sizeof(queue_entry_t) , 50) ; // max 50 groups of 5 bytes.  create queue to get data from core1
-      queue_init(&qSendCmdToCore1, 1, 10); // queue to send a cmd to core 1 (e.g. to perform a calibration of mp6050)
-      multicore_launch_core1(core1_main);// start core1 and so start I2C sensor discovery
-      multicoreIsRunning = true; // to know if multicore is running or not
-      uint32_t setup1StartUs = microsRp();  
-      while ( core1SetupDone == false) {
-            if ((microsRp() - setup1StartUs) > (2 * 1000000)) {
-                sleep_ms(3000);
-                printf("Attention: setup on core 1 did not ended within timeout\n");
-                break   ;
-            }
-      }
-      uint32_t core1SetupUs = microsRp() - setup1StartUs ; 
-      printf("Setup1 takes %d usec\n",(int) core1SetupUs) ;
-      if ( config.protocol == 'C'){   //crsf
-        setupCrsfIn();  // setup one/two uart and the irq handler (for primary Rx) 
-        setupCrsf2In();  // setup one/two uart and the irq handler (for secondary Rx) 
-        setupCrsfOut(); //  setup 1 pio/sm (for TX ) and the DMA (for TX)   
-      } else if (config.protocol == 'S') { // sport
-        setupSbusIn();
-        setupSbus2In();
-        setupSport();
-      } else if (config.protocol == 'B') { // Frsky Hub
-        setupSbusIn();
-        setupSbus2In();
-        setupFrskyHub();
-      } else if (config.protocol == 'J') {   //jeti non exbus
-        setupSbusIn();
-        setupSbus2In();
-        setupJeti();
-      } else if (config.protocol == 'H') {   //hott
-        setupSbusIn();
-        setupSbus2In();
-        setupHott();
-      } else if (config.protocol == 'M') {   //Mpx
-        setupSbusIn();
-        setupSbus2In();
-        setupMpx();
-      } else if (config.protocol == 'I') {  // ibus
-        setupIbusIn();
-        //setupSbus2In();
-        setupIbus();
-      } else if (config.protocol == '2')  {  // Sbus2 futaba
-        setupSbusIn();
-        setupSbus2In();
-        setupSbus2Tlm();
-      } else if (config.protocol == 'F') {   // fBus frsky
-        setupFbus();
-        setupSbus2In();
-        //setupSbus2Tlm();
-      } else if (config.protocol == 'L') {   // srxl2 Spektrum
-        setupSrxl2();
-        //setupSbus2In(); // to do add a second input
-        //setupSbus2Tlm();
-      } else if (config.protocol == 'E') {   // jeti Exbus
-        setupExbus();
-        //setupSbus2In(); // to do add a second input
-        //setupSbus2Tlm();
-      }
-      if (config.pinSbusOut != 255) { // configure 1 pio/sm for SBUS out (only if Sbus out is activated in config).
-          setupSbusOutPio();
-        }
-      setupPwm();
-      if ( config.pinLogger != 255) {
-        logger.begin();           // set up the logger
-      }
-      if ((config.gyroChanControl <= 16) and (mpu.mpuInstalled)) { // when the channel to control the gyro is defined and a mpu.installed
-        gyroIsInstalled=true;
-      }
-      
-      watchdog_enable(3500, 0); // require an update once every 500 msec
-  } 
-// todo - should be uncommented  
-  //printConfigAndSequencers(); 
-  setRgbColorOn(10,0,0); // set color on red (= no signal)
-  // to detect end of setup
-  //printf("end of set up\n");
-  //while (1) {watchdog_update();};
 
-  /*
-  if (clockChanged){
-    printf("clock is changed to 133mHz\n");
-  } else {
-    printf("clock is not changed\n");
-  }
-   
-    //checkLedColors(); // this program does not end and so main loop is not called.
-  if(gyroIsInstalled){
-    printf("gyro is installed\n");
-  }  else{ 
-    printf("gyro is not installed\n");
-  }
-  */
-}
-
-// Initialisiert das Gesamtsystem, alle Schnittstellen und Telemetrie-Protokolle
-void setup() {
-	stdio_init_all();								// Standard-I/O für USB-Debug initialisieren
-	set_sys_clock_khz(133000, false);				// Systemtakt auf 133 MHz festlegen
-
-#ifdef DEBUG
-	uint16_t counter = 10;							// Warterechner für USB-CDC Verbindung
-	while ((!tud_cdc_connected()) && (counter--)) {	// Auf USB-Verbindung warten
-		sleep_ms(100);								// Warteraum in Millisekunden
-	}
-	sleep_ms(2000);									// Wartezeit für Nachrichtenanzeige
-	uint8_t a1[2] = {1, 2};							// Testarray für Debug
-	int debug = 2;									// Debug-Ebene
-	debugAX("aa", a1, 2);							// Debug-Ausgabe
-#endif
-
-	if (watchdog_caused_reboot()) {					// Prüfung ob Watchdog-Neustart vorlag
-		printf("Rebooted by Watchdog!\n");			// Warnmeldung ausgeben
-		calibrateImuGyro = false;					// Kalibrierung bei Reboot überspringen
-	} else {
-		printf("Clean boot\n");						// Normaler Systemstart
-		calibrateImuGyro = true;					// Kalibrierung aktivieren
-	}
-
-	setupConfig();									// Konfigurationsparameter laden
-	setupSequencers();								// Sequenzerparameter laden
-	setupGyroMixer();								// Kreisel-Mischer initialisieren
-	checkConfigAndSequencers();						// Konfigurationsprüfung durchführen
-	setupLed();										// Status-LED initialisieren
-	setRgbColorOn(0, 0, 10);						// LED auf Blau schalten während Setup
-
-
-  // Ämderung durch INAV
-	if (configIsValid || (config.inav_ltm >= 1)) {								// Setup nur bei gültiger Konfig ausführen
-
-
-		if (config.pinHigh < 30) {					// Pin High-Level Erzwingung
-			gpio_init(config.pinHigh);				// Pin initialisieren
-			gpio_set_dir(config.pinHigh, GPIO_OUT);	// Pin als Ausgang setzen
-			gpio_put(config.pinHigh, 1);			// Ausgang auf High schalten
-		}
-		if (config.pinLow < 30) {					// Pin Low-Level Erzwingung
-			gpio_init(config.pinLow);				// Pin initialisieren
-			gpio_set_dir(config.pinLow, GPIO_OUT);	// Pin als Ausgang setzen
-			gpio_put(config.pinLow, 0);				// Ausgang auf Low schalten
-		}
-
-		for (uint8_t i = 0; i < NUMBER_MAX_IDX; i++) {	// Liste aller Telemetriefelder leeren
-			fields[i].value = 0;					// Telemetriewert zurücksetzen
-			fields[i].available = false;			// Verfügbarkeit zurücksetzen
-			fields[i].onceAvailable = false;		// Einmalige Verfügbarkeit zurücksetzen
-		}
-
-		queue_init(&qSensorData, sizeof(queue_entry_t), 50); // Sensor-Queue für Core 1 initialisieren
-		queue_init(&qSendCmdToCore1, 1, 10);		// Befehls-Queue für Core 1 initialisieren
-		multicore_launch_core1(core1_main);			// Core 1 starten
-		multicoreIsRunning = true;					// Multicore-Status setzen
-
-		uint32_t setup1StartUs = microsRp();		// Zeitmessung Start Core 1
-		while (core1SetupDone == false) {			// Warten auf Core 1 Bereitschaft
-			if ((microsRp() - setup1StartUs) > (2 * 1000000)) { // Timeout-Prüfung nach 2s
-				sleep_ms(3000);						// Pause
-				printf("Attention: setup on core 1 did not ended within timeout\n"); // Fehler
-				break;								// Schleife bei Timeout verlassen
-			}
-		}
-		uint32_t core1SetupUs = microsRp() - setup1StartUs; // Dauer Core 1 Setup berechnen
-		printf("Setup1 takes %d usec\n", (int)core1SetupUs); // Ausführungszeit ausgeben
-
-
-
-		// INAV Initialisierung
-		if (config.inav_ltm >= 1 ) { // iNav LTM Telemetrie
-			init_inav_ltm();						// LTM UART auf GP4 starten
-		} 
-    
-
-    // Empfänger / Telemetrie-Protokoll Initialisierung
-    if (config.protocol == 'C') {		// CRSF Protokoll
-			setupCrsfIn();							// Primären Rx-UART einrichten
-			setupCrsf2In();							// Sekundären Rx-UART einrichten
-			setupCrsfOut();							// CRSF TX PIO/DMA einrichten
-		} else if (config.protocol == 'S') {		// FrSky S.Port
-			setupSbusIn();							// SBUS Input 1 initialisieren
-			setupSbus2In();							// SBUS Input 2 initialisieren
-			setupSport();							// S.Port Telemetrie initialisieren
-		} else if (config.protocol == 'B') {		// Frsky Hub
-			setupSbusIn();							// SBUS Input 1 initialisieren
-			setupSbus2In();							// SBUS Input 2 initialisieren
-			setupFrskyHub();						// FrSky Hub Telemetrie starten
-		} else if (config.protocol == 'J') {		// Jeti Telemetrie
-			setupSbusIn();							// SBUS Input 1 initialisieren
-			setupSbus2In();							// SBUS Input 2 initialisieren
-			setupJeti();							// Jeti Schnittstelle starten
-		} else if (config.protocol == 'H') {		// HoTT Telemetrie
-			setupSbusIn();							// SBUS Input 1 initialisieren
-			setupSbus2In();							// SBUS Input 2 initialisieren
-			setupHott();							// Graupner HoTT starten
-		} else if (config.protocol == 'M') {		// Multiplex Telemetrie
-			setupSbusIn();							// SBUS Input 1 initialisieren
-			setupSbus2In();							// SBUS Input 2 initialisieren
-			setupMpx();								// Multiplex Telemetrie starten
-		} else if (config.protocol == 'I') {		// IBUS Telemetrie
-			setupIbusIn();							// IBUS Eingangs-UART starten
-			setupIbus();							// FlySky IBUS Telemetrie starten
-		} else if (config.protocol == '2') {		// Futaba SBUS2
-			setupSbusIn();							// SBUS Input 1 initialisieren
-			setupSbus2In();							// SBUS Input 2 initialisieren
-			setupSbus2Tlm();						// SBUS2 Telemetrie starten
-		} else if (config.protocol == 'F') {		// FrSky FBus
-			setupFbus();							// FBus Schnittstelle starten
-			setupSbus2In();							// Sekundären Eingang starten
-		} else if (config.protocol == 'L') {		// Spektrum SRXL2
-			setupSrxl2();							// SRXL2 Protokoll starten
-		} else if (config.protocol == 'E') {		// Jeti EXBus
-			setupExbus();							// EXBus Protokoll starten
-		}
-
-		if (config.pinSbusOut != 255) {				// SBUS Ausgangssignal aktiviert?
-			setupSbusOutPio();						// SBUS Out via PIO einrichten
-		}
-
-		setupPwm();									// PWM Ausgänge initialisieren
-
-		if (config.pinLogger != 255) {				// SD-Logger aktiviert?
-			logger.begin();							// SD-Karten-Logger starten
-		}
-
-		if ((config.gyroChanControl <= 16) && (mpu.mpuInstalled)) { // Kreisel vorhanden?
-			gyroIsInstalled = true;					// Kreisel-Flag auf aktiv setzen
-		}
-
-		watchdog_enable(3500, 0);					// Watchdog-Timer auf 3.5s aktivieren
-	}
-
-	setRgbColorOn(10, 0, 0);						// LED auf Rot schalten (No Signal)
-}
-
-
+// process incoming sensor data and commands queued from core 1
 void getSensorsFromCore1(){
     queue_entry_t entry;
     //printf("qlevel= %d\n",queue_get_level(&qSensorData));
@@ -1182,6 +553,9 @@ void getSensorsFromCore1(){
     }
     if ((forcedFields == 1) || (forcedFields == 2)) fillFields(forcedFields); // force dummy values for debuging a protocol
 }
+
+
+
 /*
 void printTest(int testVal){
     static uint32_t prevTime = 0;
@@ -1193,39 +567,387 @@ void printTest(int testVal){
 }
 */
 
-// process incoming sensor data and commands queued from core 1
+// Am Anfang der Datei (außerhalb der Funktionen) das neue Flag deklarieren:
+bool ltm_data_rx_flag = false; 
+
+void handle_ltm_led_core1() {
+    static uint32_t last_packet_time = 0;
+    uint32_t ms = to_ms_since_boot(get_absolute_time());
+
+    if ((config.inav_ltm == 2) )  {
+        static bool pause_eingeleitet = false; // Merker für die Pause
+
+        if (ms % 50 < 10){
+            pause_eingeleitet = false; // AN-Phase läuft, Merker zurücksetzen
+            
+            // Unser erprobtes, mattes Takt-Flimmern für die Augen
+            if ((ms / 12) % 10 == 0) {
+                setRgbColorOn(0, 0, 10); // 🔵 Mattes Blau-Flackern
+                            } else {
+                setRgbColorOn(0, 0, 0); 
+            }
+        } else {
+            // AUS-Phase läuft! Wir schalten die LED NUR EINMALIG hart aus:
+            if (!pause_eingeleitet) {
+                setRgbColorOn(0, 0, 0);    // LED komplett abdunkeln
+                pause_eingeleitet = true;  // Sperre setzen, damit der Treiber Ruhe hat!
+            }
+        }
+                // Schritt 2: Die Schranke für die große Halbsekunden-Pause dahinter setzen!
+        // In den zweiten 500ms der Sekunde knallen wir die LED unbarmherzig auf Null.
+        if (ms % 1000 >= 500) {
+            setRgbColorOn(0, 0, 0); // Absolute, digitale Funkstille für eine halbe Sekunde!
+        }
+    }
+
+
+
+    // =========================================================================
+    // 🟢 DIE PHYSIKALISCHE RETTUNG FÜR MODUS 1 (INTELLIGENTES SUCH-BLINKEN):
+    // Frei von blockierenden Treibersperren. Rechnet stur im sauberen Takt!
+    // =========================================================================
+    else if (config.inav_ltm == 1) {
+        // Wir prüfen dein originales Parser-Flag
+        if (ltm_data_rx_flag == true) {
+            last_packet_time = ms;
+            ltm_data_rx_flag = false; 
+        }
+
+        // ---------------------------------------------------------------------
+        // ZUSTAND 1: DATEN SIND DA! (Hektisches, super mattes Blau-Flackern)
+        // ---------------------------------------------------------------------
+        if (ms - last_packet_time < 300) {
+            if (ms % 60 < 30) {
+                if ((ms / 12) % 10 == 0) {
+                    setRgbColorOn(0, 0, 1); // 🔵 Mattes Blau-Flackern bei Empfang
+                } else {
+                    setRgbColorOn(0, 1, 0);
+                }
+            } else {
+               // setRgbColorOn(0, 0, 0);
+            }
+        } 
+        // ---------------------------------------------------------------------
+        // ZUSTAND 2: KEINE DATEN DA! (Ruhiges Suchen-Blinken im Sekundentakt)
+        // Kopiert eins zu eins die Logik aus Modus 2, die bei dir perfekt läuft!
+        // ---------------------------------------------------------------------
+        else {
+            static bool suche_pause_gesendet = false; // Sperr-Merker für die AUS-Phase
+
+            if (ms % 1000 < 500) {
+                suche_pause_gesendet = false; // AN-Phase läuft, Merker zurücksetzen
+                
+                // Exakt dein funktionierendes Flimmer-Raster aus Modus 2
+                if ((ms / 12) % 10 == 0) {
+                    setRgbColorOn(0, 0, 1); // 🔵 Mattes Blau-Flackern in der AN-Phase
+                } else {
+                    setRgbColorOn(0, 0, 0); 
+                }
+            } else {
+                // AUS-Phase läuft! Wir senden das "Aus" NUR EIN EINZIGES MAL:
+                if (!suche_pause_gesendet) {
+                    setRgbColorOn(0, 0, 0);       // LED komplett abdunkeln
+                    suche_pause_gesendet = true;  // Sperre setzen, Treiber hat Sendepause!
+                }
+            }
+        }
+       // setRgbColorOn(0, 0, 20);
+    }
+    
+}
+
+void getSensors_ltm(void) {
+    extern int32_t live_alt, live_mvolt, live_current, live_speed, live_sat, live_cap, live_pitch, live_roll, live_heading;
+    extern uint8_t live_flight_mode, live_is_armed;
+
+    uint32_t now_ms = millisRp(); // Holt den Millisekunden-Takt von Core 0
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+
+    // Zeitstempel für das letzte LTM-Paket merken
+    static uint32_t last_ltm_packet_ms = 0;
+
+    // =========================================================================
+    // MODUS 1: LTM Echtbetrieb über den Hardware-UART
+    // =========================================================================
+    if (config.inav_ltm == 1)  {
+        live_alt = 100; live_mvolt = 0; live_current = 0; live_speed = 0; live_sat = 0;
+        live_rpm = 0; live_cap = 0; live_pitch = 0; live_roll = 0; live_heading = 0;
+
+        has_alt = has_mvolt = has_current = has_speed = has_sat = has_rpm = has_cap = false;
+
+        bool altWasAvailable = fields[ALTITUDE].available;
+        bool voltWasAvailable = fields[MVOLT].available;
+
+        parse_inav_ltm(); // Rattert durch deinen LTM Seriell-Parser
+
+        if (fields[ALTITUDE].available)    { live_alt = fields[ALTITUDE].value; has_alt = true; }
+        if (fields[MVOLT].available)       { live_mvolt = fields[MVOLT].value; has_mvolt = true; }
+        if (fields[CURRENT].available)     { live_current = fields[CURRENT].value; has_current = true; }
+        if (fields[GROUNDSPEED].available) { live_speed = fields[GROUNDSPEED].value; has_speed = true; }
+        if (fields[NUMSAT].available)      { live_sat = fields[NUMSAT].value; has_sat = true; }
+        if (fields[RPM].available)         { live_rpm = fields[RPM].value; has_rpm = true; }
+        if (fields[CAPACITY].available)    { live_cap = fields[CAPACITY].value; has_cap = true; }
+        if (fields[PITCH].available)       { live_pitch = fields[PITCH].value; }
+        if (fields[ROLL].available)        { live_roll = fields[ROLL].value; }
+        if (fields[HEADING].available)     { live_heading = fields[HEADING].value; }
+        if (fields[TEMP1].available)       { live_flight_mode = fields[TEMP1].value; }
+        if (fields[TEMP2].available)       { live_is_armed = fields[TEMP2].value; }
+
+        // 🔵 INTELLIGENTES LTM-ECHTZEIT-BLAU:
+        if (fields[ALTITUDE].available != altWasAvailable || fields[MVOLT].available != voltWasAvailable) {
+            // Ein frisches Paket wurde decodiert! Wir setzen das Signal und flashen matt Blau (Stufe 1)
+           // last_ltm_packet_ms = now_ms;
+            //setRgbColorOn(0, 0, 1); 
+        } else {
+            // Wenn länger als 200ms kein iNav-Paket kam -> Gedimmtes Leerlauf-Glimmen über die Zeitachse
+           /* if (now_ms - last_ltm_packet_ms >= 200) {
+                if ((now_ms / 12) % 50 == 0) {
+                    setRgbColorOn(0, 0, 1); // Ganz kurz matt Blau
+                } else {
+                    setRgbColorOn(0, 0, 0); // Aus
+                }
+            } else {
+                // Sofortiger Takt-Rücksprung nach dem Paket-Blitz
+                setRgbColorOn(0, 0, 0); 
+            }*/
+        }
+    } 
+    // =========================================================================
+    // MODUS 2: LTM Simulationsbetrieb am Schreibtisch
+    // =========================================================================
+    else if (config.inav_ltm == 2) {
+        live_alt         = 15000;    
+        live_mvolt       = 12400;    
+        live_current     = 1500;     
+        live_speed       = 4500;     
+        live_sat         = 9;        
+        live_rpm         = 3200;     
+        live_pitch       = 10;       
+        live_roll        = 5;        
+        live_heading     = 180;      
+        live_cap         = 850;  
+        live_flight_mode = 13;
+        live_is_armed    = 1;
+
+
+    }
+    // =========================================================================
+    // MODUS 3 / 4: FrSky-Betrieb (Werte von Core 1 abholen, LED schläft hier!)
+    // =========================================================================
+    else if (config.inav_ltm == 3 || config.inav_ltm == 4) {
+        live_alt         = fields[ALTITUDE].value;       
+        live_mvolt       = fields[MVOLT].value;    
+        live_current     = fields[CURRENT].value;     
+        live_speed       = fields[GROUNDSPEED].value;     
+        live_sat         = fields[NUMSAT].value;        
+        live_rpm         = fields[RPM].value;     
+        live_pitch       = fields[PITCH].value;       
+        live_roll        = fields[ROLL].value;        
+        live_heading     = fields[HEADING].value;      
+        live_cap         = fields[CAPACITY].value;      
+        live_flight_mode = fields[TEMP1].value;
+        live_is_armed    = fields[TEMP2].value;
+    } 
+
+    // Spiegelung und unberührter originaler Flag-Wust (Absolut identisch!)
+    fields[ALTITUDE].value     = live_alt;       
+    if (config.inav_ltm != 3 && config.inav_ltm != 4) {
+        fields[MVOLT].value        = live_mvolt;    
+        fields[CURRENT].value      = live_current;     
+        fields[GROUNDSPEED].value  = live_speed;     
+        fields[NUMSAT].value       = live_sat;        
+        fields[RPM].value          = live_rpm;     
+        fields[PITCH].value        = live_pitch;       
+        fields[ROLL].value         = live_roll;        
+        fields[HEADING].value      = live_heading;      
+        fields[CAPACITY].value     = live_cap;      
+    }
+    fields[TEMP1].value        = live_flight_mode;
+    fields[TEMP2].value        = live_is_armed;
+
+    fields[ALTITUDE].available    = fields[MVOLT].available       = fields[CURRENT].available     = true; 
+    fields[GROUNDSPEED].available = fields[NUMSAT].available      = fields[RPM].available         = true; 
+    fields[PITCH].available       = fields[ROLL].available        = fields[HEADING].available     = true; 
+    fields[CAPACITY].available    = fields[TEMP1].available       = fields[TEMP2].available       = true;
+
+    fields[ALTITUDE].onceAvailable    = fields[MVOLT].onceAvailable       = fields[CURRENT].onceAvailable     = true;
+    fields[GROUNDSPEED].onceAvailable = fields[NUMSAT].onceAvailable      = fields[PITCH].onceAvailable       = true;
+    fields[ROLL].onceAvailable        = fields[HEADING].onceAvailable     = fields[CAPACITY].onceAvailable    = true;
+    fields[TEMP1].onceAvailable       = fields[TEMP2].onceAvailable       = fields[RPM].onceAvailable         = true;
+    
+    vario1.calculateAltVspeed(fields[ALTITUDE].value, 200000);
+    fields[VSPEED].available = true;
+
+    fields[RELATIVEALT].value     = fields[ALTITUDE].value;
+    fields[RELATIVEALT].available = true;
+    fields[RESERVE2].value        = fields[MVOLT].value;
+    fields[RESERVE2].available    = true;
+
+    fields[VSPEED].value = 0;
+    fields[VSPEED].available = fields[VSPEED].onceAvailable = true; 
+
+    
+    //setRgbColorOn(0, 0, 20);
+}
+
 
 
 #define MAIN_LOOP 0
 
 
 
+// Initialisiert das Gesamtsystem, alle Schnittstellen und Telemetrie-Protokolle
+void setup() {
+	stdio_init_all();								// Standard-I/O für USB-Debug initialisieren
+	set_sys_clock_khz(133000, false);				// Systemtakt auf 133 MHz festlegen
+
+#ifdef DEBUG
+	uint16_t counter = 10;							// Warterechner für USB-CDC Verbindung
+	while ((!tud_cdc_connected()) && (counter--)) {	// Auf USB-Verbindung warten
+		sleep_ms(100);								// Warteraum in Millisekunden
+	}
+	sleep_ms(2000);									// Wartezeit für Nachrichtenanzeige
+	uint8_t a1[2] = {1, 2};							// Testarray für Debug
+	int debug = 2;									// Debug-Ebene
+	debugAX("aa", a1, 2);							// Debug-Ausgabe
+#endif
+
+	if (watchdog_caused_reboot()) {					// Prüfung ob Watchdog-Neustart vorlag
+		printf("Rebooted by Watchdog!\n");			// Warnmeldung ausgeben
+		calibrateImuGyro = false;					// Kalibrierung bei Reboot überspringen
+	} else {
+		printf("Clean boot\n");						// Normaler Systemstart
+		calibrateImuGyro = true;					// Kalibrierung aktivieren
+	}
+
+	setupConfig();									// Konfigurationsparameter laden
+	setupSequencers();								// Sequenzerparameter laden
+	setupGyroMixer();								// Kreisel-Mischer initialisieren
+	checkConfigAndSequencers();						// Konfigurationsprüfung durchführen
+
+    if ((config.inav_ltm == 1)||(config.inav_ltm == 2 ) ) {
+	  setupLed();									// Status-LED initialisieren
+	  setRgbColorOn(0, 0, 10);						// LED auf Rot schalten während Setup
+    }
+    else if (config.inav_ltm == 0) {
+	  setupLed();									// Status-LED initialisieren
+	  setRgbColorOn(10, 0, 0);						// LED auf Blau schalten während Setup
+    }
+
+  // Ämderung durch INAV
+	if (configIsValid || (config.inav_ltm <= 2)) {								// Setup nur bei gültiger Konfig ausführen
+
+
+		if (config.pinHigh < 30) {					// Pin High-Level Erzwingung
+			gpio_init(config.pinHigh);				// Pin initialisieren
+			gpio_set_dir(config.pinHigh, GPIO_OUT);	// Pin als Ausgang setzen
+			gpio_put(config.pinHigh, 1);			// Ausgang auf High schalten
+		}
+		if (config.pinLow < 30) {					// Pin Low-Level Erzwingung
+			gpio_init(config.pinLow);				// Pin initialisieren
+			gpio_set_dir(config.pinLow, GPIO_OUT);	// Pin als Ausgang setzen
+			gpio_put(config.pinLow, 0);				// Ausgang auf Low schalten
+		}
+
+		for (uint8_t i = 0; i < NUMBER_MAX_IDX; i++) {	// Liste aller Telemetriefelder leeren
+			fields[i].value = 0;					// Telemetriewert zurücksetzen
+			fields[i].available = false;			// Verfügbarkeit zurücksetzen
+			fields[i].onceAvailable = false;		// Einmalige Verfügbarkeit zurücksetzen
+		}
+
+		queue_init(&qSensorData, sizeof(queue_entry_t), 50); // Sensor-Queue für Core 1 initialisieren
+		queue_init(&qSendCmdToCore1, 1, 10);		// Befehls-Queue für Core 1 initialisieren
+		multicore_launch_core1(core1_main);			// Core 1 starten
+		multicoreIsRunning = true;					// Multicore-Status setzen
+
+		uint32_t setup1StartUs = microsRp();		// Zeitmessung Start Core 1
+		while (core1SetupDone == false) {			// Warten auf Core 1 Bereitschaft
+			if ((microsRp() - setup1StartUs) > (2 * 1000000)) { // Timeout-Prüfung nach 2s
+				sleep_ms(3000);						// Pause
+				printf("Attention: setup on core 1 did not ended within timeout\n"); // Fehler
+				break;								// Schleife bei Timeout verlassen
+			}
+		}
+		uint32_t core1SetupUs = microsRp() - setup1StartUs; // Dauer Core 1 Setup berechnen
+		printf("Setup1 takes %d usec\n", (int)core1SetupUs); // Ausführungszeit ausgeben
+
+
+
+		// INAV Initialisierung
+		if ((config.inav_ltm == 1 ) || (config.inav_ltm == 2 )) { // iNav LTM Telemetrie
+			init_inav_ltm();						// LTM UART auf GP4 starten
+		} 
+		// INAV Initialisierung
+		//if (config.inav_ltm == 3 ) { // iNav LTM Telemetrie
+		//	init_inav_frsky();						// LTM UART auf GP4 starten
+		//}    
+
+    // Empfänger / Telemetrie-Protokoll Initialisierung
+    if (config.protocol == 'C') {		// CRSF Protokoll
+			setupCrsfIn();							// Primären Rx-UART einrichten
+			setupCrsf2In();							// Sekundären Rx-UART einrichten
+			setupCrsfOut();							// CRSF TX PIO/DMA einrichten
+		} else if (config.protocol == 'S') {		// FrSky S.Port
+			setupSbusIn();							// SBUS Input 1 initialisieren
+			setupSbus2In();							// SBUS Input 2 initialisieren
+			setupSport();							// S.Port Telemetrie initialisieren
+		} else if (config.protocol == 'B') {		// Frsky Hub
+			setupSbusIn();							// SBUS Input 1 initialisieren
+			setupSbus2In();							// SBUS Input 2 initialisieren
+			setupFrskyHub();						// FrSky Hub Telemetrie starten
+		} else if (config.protocol == 'J') {		// Jeti Telemetrie
+			setupSbusIn();							// SBUS Input 1 initialisieren
+			setupSbus2In();							// SBUS Input 2 initialisieren
+			setupJeti();							// Jeti Schnittstelle starten
+		} else if (config.protocol == 'H') {		// HoTT Telemetrie
+			setupSbusIn();							// SBUS Input 1 initialisieren
+			setupSbus2In();							// SBUS Input 2 initialisieren
+			setupHott();							// Graupner HoTT starten
+		} else if (config.protocol == 'M') {		// Multiplex Telemetrie
+			setupSbusIn();							// SBUS Input 1 initialisieren
+			setupSbus2In();							// SBUS Input 2 initialisieren
+			setupMpx();								// Multiplex Telemetrie starten
+		} else if (config.protocol == 'I') {		// IBUS Telemetrie
+			setupIbusIn();							// IBUS Eingangs-UART starten
+			setupIbus();							// FlySky IBUS Telemetrie starten
+		} else if (config.protocol == '2') {		// Futaba SBUS2
+			setupSbusIn();							// SBUS Input 1 initialisieren
+			setupSbus2In();							// SBUS Input 2 initialisieren
+			setupSbus2Tlm();						// SBUS2 Telemetrie starten
+		} else if (config.protocol == 'F') {		// FrSky FBus
+			setupFbus();							// FBus Schnittstelle starten
+			setupSbus2In();							// Sekundären Eingang starten
+		} else if (config.protocol == 'L') {		// Spektrum SRXL2
+			setupSrxl2();							// SRXL2 Protokoll starten
+		} else if (config.protocol == 'E') {		// Jeti EXBus
+			setupExbus();							// EXBus Protokoll starten
+		}
+
+		if (config.pinSbusOut != 255) {				// SBUS Ausgangssignal aktiviert?
+			setupSbusOutPio();						// SBUS Out via PIO einrichten
+		}
+
+		setupPwm();									// PWM Ausgänge initialisieren
+
+		if (config.pinLogger != 255) {				// SD-Logger aktiviert?
+			logger.begin();							// SD-Karten-Logger starten
+		}
+
+		if ((config.gyroChanControl <= 16) && (mpu.mpuInstalled)) { // Kreisel vorhanden?
+			gyroIsInstalled = true;					// Kreisel-Flag auf aktiv setzen
+		}
+
+		watchdog_enable(3500, 0);					// Watchdog-Timer auf 3.5s aktivieren
+	}
+
+	//setRgbColorOn(10, 0, 0);						// LED auf Rot schalten (No Signal)
+}
 
 void loop() {
   //debugBootButton();
     //startTimerUs(MAIN_LOOP);                            // start a timer to measure enlapsed time
 
-  // LED-DIAGNOSE FÜR DEN TISCHTEST:
-/*static bool ledInit = false;
-  if (!ledInit) {
-      gpio_init(25);
-      gpio_set_dir(25, GPIO_OUT);
-      ledInit = true;
-  }
 
-  // BLINKCODE-ABFRAGE:
-  if (config.inav_ltm == 1) {
-      if (!configIsSaved) {
-          // CODE 1: Schnelles, hektisches Blinken -> Das EEPROM blockiert (configIsSaved ist false)
-          gpio_put(25, (millisRp() % 200 < 100)); 
-      } else if (!configIsValid) {
-          // CODE 2: Langsames, ruhiges Blinken -> Das Framework überschreibt configIsValid im Hintergrund
-          gpio_put(25, (millisRp() % 1000 < 500)); 
-      } else {
-          // CODE 3: Dauer-An -> Alles ist perfekt, der Kern läuft und sendet!
-          gpio_put(25, 1); 
-      }
-  }*/
 
   if (((configIsValid) and (configIsSaved)) or (config.inav_ltm >= 1)) {
 
@@ -1233,9 +955,10 @@ void loop() {
       // =================================================================
       // STRATEGISCHE SINGLE-CORE WEICHE
       // =================================================================
-      if (config.inav_ltm > 0) {
+      if ((config.inav_ltm == 1) || (config.inav_ltm == 2) ) {
           getSensors_ltm();     // Verarbeitet Einlesen, Tischtest & Dauerfeuer direkt auf Core 0
-    
+          handle_ltm_led_core1();
+
         } else {
           getSensorsFromCore1(); // Holt im Normalmodus die Hardware-Sensoren von Core 1
 
@@ -1294,7 +1017,7 @@ void loop() {
         calibrateGyroMixers();   // check if user ask for gyro calibration
         applyGyroCorrections();  // apply corrections (if rcChannelsCorrUs changed) 
       }
-      setLedState();                // set the color of the led
+      //setLedState();                // set the color of the led
       fillSbusFrame(); // once per 9 msec convert current rcChannelsUsCorr back to Sbus format and generate the sbus frame
       updatePWM(); // update PWM pins only based on channel values with corrections (not sequencer); 
       rcChannelsUsCorrChanged = false;  // reset the flag used to avoid updates at each loop
@@ -1318,37 +1041,41 @@ void loop() {
 
   if ( configIsValidPrev != configIsValid) {
     configIsValidPrev = configIsValid;
-    if ((configIsValid) and (configIsSaved)){
+ /*   if ((configIsValid) and (configIsSaved) and (config.inav_ltm == 0)){
         blinking = true; // setRgbColorOn(0,10,0); // red , green , blue
     } else {
         blinking = false; // setRgbColorOn(10,0,0);
         setRgbOn();  
-    }
+    }*/
   }
 
 
 
   //printf("after tud-task\n");sleep_ms(100); 
-  if ( configIsValidPrev != configIsValid) {
+  /*if ( configIsValidPrev != configIsValid) {
     configIsValidPrev = configIsValid;
     if ((configIsValid) and (configIsSaved)){
-        blinking = true; // setRgbColorOn(0,10,0); // red , green , blue
+       //blinking = true; // setRgbColorOn(0,10,0); // red , green , blue
     } else {
         blinking = false; // setRgbColorOn(10,0,0);
-        setRgbOn();  
+        // setRgbOn();  
     }
-  }
+  }*/
+
+
+
   //printf("before handleBootButton\n");sleep_ms(100); 
   handleBootButton(); // check boot button; after double click, change LED to fix blue and next HOLD within 5 sec save the current channnels as Failsafe values
   //printf("after handleBootButton\n");sleep_ms(100); 
   if (( bootButtonState == ARMED) || ( bootButtonState == SAVED)){
-    //setRgbColorOn(0, 0, 10); //blue
-  } else if ( ledState != prevLedState){
-    //printf(" %d\n ",ledState);
-    prevLedState = ledState;
-    setColorState();     
+   // setRgbColorOn(0, 0, 10); //blue
+ } else if ( ledState != prevLedState ){
+    if (config.inav_ltm == 0) { // 🟢 NUR im normalen oXs-Modus schalten!
+        prevLedState = ledState;
+        setColorState();     
+    }
   } else if ( blinking && (( millisRp() - lastBlinkMillis) > 300 ) ){
-    toggleRgb();
+    // toggleRgb();
     lastBlinkMillis = millisRp();
   }
   //if (get_bootsel_button()) {
@@ -1356,55 +1083,93 @@ void loop() {
   //} 
   //enlapsedTime(0);
   //printf("end of loop\n");sleep_ms(100);   
-}
-
-// initialisation of core 1 that capture the sensor data
-void setup1(){
-    multicore_lockout_victim_init();
-    setupSensors();    
-}
-// main loop on core 1 in order to read the sensors and send the data to core0
-#define MAIN_LOOP1 1
-
-void loop1(){
-    //startTimerUs(MAIN_LOOP1);
-    uint8_t qCmd;
-    if (config.inav_ltm == 0) {
-
-       getSensors(); // get sensor
-
-
-    if (config.pinSpiCs != 255) {
-        loraHandle() ;
-    }
-    // get some request from core0
-    if ( ! queue_is_empty(&qSendCmdToCore1)){
-        queue_try_remove(&qSendCmdToCore1, &qCmd);
-        if ( qCmd == REQUEST_USB_HORIZONTAL_MPU_CALIB) { // 0X01 is the code to request an horizontal calibration
-            mpu.usbOrientationHorizontalExecute();
-        } else if ( qCmd == REQUEST_USB_VERTICAL_MPU_CALIB) { // 0X02 is the code to request a vertical calibration
-            mpu.usbOrientationVerticalExecute();
-        } else if (qCmd == REQUEST_NEXT_ACC_CALIB) {
-            mpu.nextAccCalibrationExecute();
-        } else if (qCmd == REQUEST_HORIZONTAL_MPU_ORIENTATION ) {
-            mpu.orientationExecute(true);
-        } else if (qCmd == REQUEST_VERTICAL_MPU_ORIENTATION ) {
-            mpu.orientationExecute(false); // perform check Vertical orientation
-        } else if (qCmd == REQUEST_GYRO_CALIBRATION ) {
-            mpu.gyroCalibrationExecute(); // perform gyro calibration
-        } 
-        
-    }
-  }
-    //alarmTimerUs(MAIN_LOOP1, 500);
-}
-
-void core1_main(){
-    setup1();
-    while(1) loop1();
+ 
 }
 
 int main(){
   setup();
   while(1) loop();
 }
+
+
+//======================================================================================
+
+// initialisation of core 1 that capture the sensor data
+void setup1(){
+    multicore_lockout_victim_init();
+    setupSensors();    
+    
+    if ((config.inav_ltm == 3)||(config.inav_ltm == 4 ) ) {
+	  setupLed();									// Status-LED initialisieren
+	  setRgbColorOn(0, 10, 0);						// LED auf Grün schalten während Setup
+    }
+
+    if (config.inav_ltm >= 3 ) { // iNav LTM Telemetrie
+        init_frsky_sensors_core1(); 
+        //init_inav_frsky();       // LTM UART auf GP4 starten
+    }  
+}
+
+
+// main loop on core 1 in order to read the sensors and send the data to core0
+#define MAIN_LOOP1 1
+
+void loop1() {
+    //startTimerUs(MAIN_LOOP1);
+    uint8_t qCmd;
+
+    // Wenn inav_ltm == 0 ist, läuft die originale oXs-Sensorverarbeitung
+    if (config.inav_ltm == 0) {
+
+        getSensors(); // get sensor
+
+        if (config.pinSpiCs != 255) {
+            loraHandle();
+        }
+
+        // Holt Kalibrierungsbefehle von Core 0 ab
+        if (!queue_is_empty(&qSendCmdToCore1)) {
+            queue_try_remove(&qSendCmdToCore1, &qCmd);
+            if (qCmd == REQUEST_USB_HORIZONTAL_MPU_CALIB) { 
+                mpu.usbOrientationHorizontalExecute();
+            } else if (qCmd == REQUEST_USB_VERTICAL_MPU_CALIB) { 
+                mpu.usbOrientationVerticalExecute();
+            } else if (qCmd == REQUEST_NEXT_ACC_CALIB) {
+                mpu.nextAccCalibrationExecute();
+            } else if (qCmd == REQUEST_HORIZONTAL_MPU_ORIENTATION) {
+                mpu.orientationExecute(true);
+            } else if (qCmd == REQUEST_VERTICAL_MPU_ORIENTATION) {
+                mpu.orientationExecute(false); 
+            } else if (qCmd == REQUEST_GYRO_CALIBRATION) {
+                mpu.gyroCalibrationExecute(); 
+            } 
+        }
+    } // <-- Hier schließt mstrens das obere "if (config.inav_ltm == 0)"
+
+    // Wenn inav_ltm == 3 ist, läuft dein FrSky-Sensor-Modus völlig exklusiv
+    if (config.inav_ltm == 3) {
+        read_frsky_sensors_core1();
+    }
+
+    // NEU - TESTMODUS: Künstliche Daten ohne Sensor erzeugen
+    if (config.inav_ltm == 4) {
+        simulate_frsky_sensors_core1();
+    }
+
+        //  MODUS 1 & 2: Altes LTM-Live und LTM-Tischtest (Übergibt die LED-Arbeit an Core 1)
+    if ((config.inav_ltm == 1) || (config.inav_ltm == 2)) {
+       // handle_ltm_led_core1();
+    }
+    
+    //alarmTimerUs(MAIN_LOOP1, 500);
+}
+
+
+void core1_main(){
+    setup1();
+    while(1) loop1();
+}
+
+
+
+

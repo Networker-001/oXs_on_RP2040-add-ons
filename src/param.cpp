@@ -71,6 +71,8 @@ extern uint32_t lastRcChannels;
 
 CONFIG config;
 uint8_t debugTlm = 'N';
+uint8_t debugVal = 'N';
+
 uint8_t debugSbusOut = 'N';
 uint8_t debugAccZ = 'N';
 
@@ -236,7 +238,7 @@ void printHelp(){
     printf("                            SEQ = DEL           Erase all sequencer\n");
 
     printf("   Display raw Acc Z        DEBUGACCZ = Y or N  display vertical acc (useful to check offsets)\n");
-    printf("Testing                     FV                  Field Values (display all telemetry internal values)\n")  ;
+    printf("   Testing                  FV                  Field Values (display all telemetry internal values)\n")  ;
     printf("                            FVP                 Field Values Positieve (force the tlm values to positieve dummy values\n")  ;
     printf("                            FVN                      idem with negatieve values\n")  ;
 
@@ -245,33 +247,45 @@ void printHelp(){
     // NEU: SCHNELLÜBERSICHT FÜR DEN I-NAV KONVERTER
     // =================================================================
 
-        printf("\n--- INAV TELEMETRIE-KONVERTER BEFEHLE ---\n")  ;
-    printf("  HINWEIS: Eingaben muessen mit Leerzeichen um das '=' erfolgen (z.B. INAV = 1)\n\n")  ;
+    printf("\n--- TELEMETRIE-CONVERTER Commands ---\n")  ;
+    printf("  Remark: Inputs have to be with enclosing space ' = ' (e.g. CONV = 1)\n\n")  ;
     
-    printf("  1. Eingangs-Modus (iNav LTM an GPIO 5):\n")  ;
-    printf("     INAV = 1           : Schaltet den Konverter-Modus ein\n")  ;
-    printf("     INAV = 2           : Schaltet den Konverter-Modus mit simulierten Festwerten ein\n")  ;
-    printf("     INAV = 0           : Deaktiviert den iNav-Eingang\n\n")  ;
+    printf("  1. Input-Mode (Selection for Telemetrie Modul):\n")  ;
+    printf("     CONV = 1           : Activate Converter LTM  (GPIO 5)\n")  ;
+    printf("     CONV = 2           : Activate Converter with Simulated Values\n")  ;
+    printf("     CONV = 3           : Activate Converter FrSky (GPIO 2)\n")  ;
+    printf("     CONV = 4           : Activate Converter FrSky with Simulated Values\n")  ;
+    printf("     CONV = 0           : Deactivate Converter Input\n\n")  ;
     
-    printf("  2. Ausgangs-Protokoll (Auswahl fuer Empfaenger):\n")  ;
-    printf("     PROTOCOL = M       : Schaltet den Ausgang auf MULTIPLEX um\n")  ;
-    printf("     PROTOCOL = E       : Schaltet den Ausgang auf JETI (EXBUS) um\n")  ;
-    printf("     PROTOCOL = H       : Schaltet den Ausgang auf Graupner HoTT um\n\n")  ;
+    printf("  2. Input-PIN (Selection for Telemetrie Modul):\n")  ;
+    printf("     CONV_PIN = 1 - 4   : Switch Input to GPIO 1- 4\n\n")  ;
+
+    printf("  3. Output-Protocol (Selection for Receiver):\n")  ;
+    printf("     PROTOCOL = M       : Switch Output to MULTIPLEX \n")  ;
+    printf("     PROTOCOL = E       : Switch Output to JETI (EXBUS) \n")  ;
+    printf("     PROTOCOL = H       : Switch Output to Graupner HoTT \n\n")  ;
+    printf("     PROTOCOL = C       : Switch Output to CRSF (ELRS) \n\n")  ;
     
-    printf("  3. Ausgangs-Port (Auswahl fuer Empfaenger):\n")  ;
-    printf("     TLM = 0            : TLM Port fuer HoTT oder MULTIPLEX (GPIO 0)\n")  ;
-    printf("     TLM = 255          : Deaktiviert den TLM Port (fuer Jeti EX-Bus zwingend)\n")  ;
-    printf("     PRI = 255          : Deaktiviert den PRI Port (fuer HoTT oder MULTIPLEX)\n")  ;
-    printf("     PRI = 9            : PRI Port fuer Jeti EX-Bus aktivieren (GPIO 9)\n\n")  ;
+    printf("  4. Output-Port (Selection for Receiver):\n")  ;
+    printf("     TLM = 0            : TLM Port for HoTT, MPX, CRSF (GPIO 0)\n")  ;
+    printf("     TLM = 255          : Deactivate the TLM Port (required for Jeti EX-Bus)\n")  ;
+    printf("     PRI = 255          : Deactivate the PRI Port (for HoTT, FRSKY, or MULTIPLEX)\n")  ;
+    printf("     PRI = 9            : Activate the PRI Port for Jeti EX-Bus (GPIO 9)\n\n")  ;
     
-    printf("  4. Einstellungen dauerhaft sichern:\n")  ;
-    printf("     SAVE               : Speichert alle Parameter im Flash-Speicher des Pico\n")  ;
+    printf("  5. Save Settings permanent:\n")  ;
+    printf("     SAVE               : Save all parameters in the flash memory of the Zero\n\n")  ;
+
+    printf("  6. Debugging:\n")  ;
+    printf("     FV                 : Show telemetrie values once \n")  ;
+    printf("     DT = Y             : Show incomming FRSKY pakets \n")  ;
+    printf("     DV = Y             : Show incomming FRSKY values \n")  ;
+
     printf("------------------------------------------\n\n")  ;
 
     // =================================================================
 
-    printf("                            PWM                 Display the current PWM values (in micro sec)\n");
-    printf("                            DEBUG=HELP          display commands to get some debug messages (up to next reset)\n");
+    printf("  PWM                   : Display the current PWM values (in micro sec)\n");
+    printf("  DEBUG=HELP            : display commands to get some debug messages (up to next reset)\n");
     printf("\n");
     printf("To get the current config, just press Enter; send DUMP in order to get it in a way that allows copy/edit/paste.\n");
     printf("To save changes, send SAVE; to get list of all commands send ""?""\n");
@@ -646,7 +660,7 @@ int8_t handleOneCmd( char * bufferPos){ // handle one command with buffer starti
     }
     
     // change debugTlm
-    if ( strcmp("DEBUGTLM", pkey) == 0 ) { // if the key is DEBUGTLM
+    if (( strcmp("DEBUGTLM", pkey) == 0 ) || ( strcmp("DT", pkey) == 0 ) ){ // if the key is DEBUGTLM
         if (strcmp("Y", pvalue) == 0) {
             debugTlm = 'Y';
             return 0;
@@ -657,7 +671,20 @@ int8_t handleOneCmd( char * bufferPos){ // handle one command with buffer starti
             printf("Error : DEBUGTLM must be Y or N\n");
         }
     }
-    
+ 
+     // change debugTlm values
+    if (( strcmp("DEBUGVAL", pkey) == 0 ) || ( strcmp("DV", pkey) == 0 ) ){ // if the key is DEBUGTLM
+        if (strcmp("Y", pvalue) == 0) {
+            debugVal = 'Y';
+            return 0;
+        } else if (strcmp("N", pvalue) == 0) {
+            debugVal = 'N';
+            return 0; 
+        } else  {
+            printf("Error : DEBUGVAL must be Y or N\n");
+        }
+    }   
+
     // change debugSbusOut
     if ( strcmp("DEBUGSBUSOUT", pkey) == 0 ) { // if the key is DEBUGSBUSOUT
         if (strcmp("Y", pvalue) == 0) {
@@ -1414,19 +1441,43 @@ int8_t handleOneCmd( char * bufferPos){ // handle one command with buffer starti
  
 
 // change INAV LTM setting
-    if ( strcmp("INAV", pkey) == 0 || strcmp("INAV_LTM", pkey) == 0 ) { 
+    if ( strcmp("INAV", pkey) == 0 || strcmp("INAV_LTM", pkey) == 0 || strcmp("CONV", pkey) == 0 ) { 
         ui = strtoul(pvalue, &ptr, 10);
         if ( *ptr != 0x0){
-            printf("Error : INAV LTM setting must be an integer\n");
-        } else if ( !(ui <= 2) ) {
-            printf("Error : INAV LTM setting must be 0 (disabled), 1 (enabled) or 2 (Testdata)\n");
+            printf("Error : CONV / FRSKY setting must be an integer\n");
+        } else if ( !(ui <= 4) ) {
+            printf("Error : CONV / FRSKY setting must be 0 (disabled), 1 (enabled), 2 (Testdata), 3 (FRSKY) or 4 (Simulated)\n");
         } else {    
             config.inav_ltm = (uint8_t) ui;
-            printf("INAV LTM telemetry = %u\n", config.inav_ltm);
+            printf("Convert Telemetry = %u\n", config.inav_ltm);
+             // Das wirft alle alten Simulator- oder Akku-Zellen restlos aus dem Speicher.
+            extern volatile uint16_t rx_cells_mvolt[];
+            for (int i = 0; i < 8; i++) {
+                rx_cells_mvolt[i] = 0;
+            }  
+            fields[NUMSAT].value = 0;      
+               
             return 1;
         }
     }    
  
+    // 🟢 NEU: Auswertung für den kofigurierbaren Telemetrie-Eingangspin (CONV_PIN)
+    if (( strcmp("CONV_PIN", pkey) == 0 ) ||( strcmp("CP", pkey) == 0 )){ 
+        ui = strtoul(pvalue, &ptr, 10);
+        if ( *ptr != 0x0 ){
+            printf("Error : CONV_PIN setting must be an integer\n");
+        } else if ( !(ui >= 2 && ui <= 4) ) {
+            // Krisensichere Bereichsprüfung: Erlaubt sind starr nur die GPIOs 2, 3 und 4
+            printf("Error : CONV_PIN setting must be between 2 and 4\n");
+        } else {    
+            config.inav_ltm_pin = (uint8_t) ui;
+            printf("Convert Telemetry Input Pin = %u\n", config.inav_ltm_pin);
+            return 2;
+        }
+    }    
+
+
+
     // Eigener Diagnose-Befehl zur Speicheranalyse
     if ( strcmp("DIAG", pkey) == 0 ) { 
         printf("\n--- DIAGNOSE: SPEICHER-ANALYSE ---\n");
@@ -1802,14 +1853,28 @@ void printConfigAndSequencers(){   // print all and perform checks
     // =================================================================
     // I-NAV LTM INPUT DIREKT IM HAUPTMENÜ ANZEIGEN
     // =================================================================
-    printf("iNav LTM Input  . . . . . =  ")  ;
+    printf("Protocol Converter  . . . =  ")  ;
     if (config.inav_ltm == 1) {
-        printf("1 (INAV-Konverter-Betrieb an GPIO 5)\n")  ;
+        printf("1 (INAV-Converter on GPIO 5)\n")  ;
     } else if (config.inav_ltm == 2) {
-        printf("2 (INAV-Konverter / Simulierte Festwerte)\n")  ;
-    } else {
-        printf("0 (INAV-Konverter / Deaktiviert)\n")  ;
+        printf("2 (INAV-Converter / Simulatetd Values)\n")  ;
+    } else if (config.inav_ltm == 3) {
+        printf("3 (FRSKY-Converter on CONV_PIN)\n")  ;
+     } else if (config.inav_ltm == 4) {
+        printf("4 (FRSKY-Converter Simulatetd Values)\n")  ;
+    } else if (config.inav_ltm == 0) {
+        printf("0 (INAV Converter deactivated)\n")  ;
     }
+
+    printf("Protocol Converter PIN . .=  ")  ;
+    if (config.inav_ltm_pin == 2) {
+        printf("2 (CONV_PIN on GPIO 2)\n")  ;
+    } else if (config.inav_ltm_pin == 3) {
+        printf("3 (CONV_PIN on GPIO 3)\n")  ;
+    } else if (config.inav_ltm_pin == 4) {
+        printf("4 (CONV_PIN on GPIO 4)\n")  ;
+    }
+   
     // =================================================================    
     printf("CRSF baudrate . . . . .   =  %" PRIu32 "\n", config.crsfBaudrate)  ;
     printf("Logger baudrate . . . . . =  %" PRIu32 "\n", config.loggerBaudrate)  ;
@@ -2053,7 +2118,7 @@ void setupConfig(){   // The config is uploaded at power on
         memcpy( &config , flash_target_contents, sizeof(config));
        
  // Safety-Check fuer neues inav_ltm Feld bei bestehendem Flash
-        if (config.inav_ltm > 2) {
+        if (config.inav_ltm > 4) {
             config.inav_ltm = 0;                  // Default: Deaktiviert
         }      
              
@@ -2221,7 +2286,8 @@ void setupConfig(){   // The config is uploaded at power on
 
         config.pinHigh = _pinHigh;
         config.pinLow = _pinLow;
-        config.inav_ltm = _inav_ltm;                     
+        config.inav_ltm = _inav_ltm;        
+        config.inav_ltm_pin = 2;             
     }     
 
 } 

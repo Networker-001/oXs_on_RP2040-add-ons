@@ -42,7 +42,8 @@ extern CONFIG config;
 extern uint8_t debugTlm;
 extern ADS1115 adc1;
 extern ADS1115 adc2;
-
+extern uint16_t rx_cells_mvolt[];
+extern bool has_rx_cells;
 
 // one pio and 2 state machines are used to manage the hott bus in halfduplex
 // one state machine (sm) handle the TX and the second the RX
@@ -117,6 +118,8 @@ extern void delay(unsigned long ms) ;
 static union {              // union is a easy way to access the data in several ways (name of field + index of byte)
     HOTT_GAM_MSG gamMsg ;   // structured general air module
     HOTT_GPS_MSG gpsMsg ;
+    HOTT_VARIO_MSG varioMsg ;
+    
     uint8_t txBuffer[TXHOTTDATA_BUFFERSIZE] ;
 }  __attribute__((packed)) TxHottData ;
 
@@ -238,6 +241,9 @@ bool sendHottFrame(uint8_t data) { // return true when a frame is being sent
         case HOTT_TELEMETRY_GPS_SENSOR_ID:
             sendingRequired = fillHottGpsFrame();
             break;
+        case HOTT_TELEMETRY_VARIO_SENSOR_ID:  
+            sendingRequired = fillHottVarioFrame();
+            break;
     }
     if (sendingRequired) { // when buffer is filled, it can be sent
         hott_uart_rx_program_stop(hottPio, hottSmRx, config.pinTlm); // stop receiving
@@ -250,13 +256,140 @@ bool sendHottFrame(uint8_t data) { // return true when a frame is being sent
 }       
 
 bool fillHottGamFrame(){
+    memset(&TxHottData.txBuffer, 0 , TXHOTTDATA_BUFFERSIZE) ;
+    TxHottData.gamMsg.start_byte    = 0x7c ;
+    TxHottData.gamMsg.gam_sensor_id = 0x8d ; //GENRAL AIR MODULE = HOTT_TELEMETRY_GAM_SENSOR_ID
+    TxHottData.gamMsg.sensor_id     = 0xd0 ;
+    TxHottData.gamMsg.stop_byte     = 0x7D ;
+// in general air module data to fill are:
+
+    // 🟢 ABSOLUT VERLÄSSLICH: Da dein Parser rx_cells_mvolt[] füllt und has_rx_cells setzt,
+    // greift Mstrens' originaler Code deine LiPo-Zellen hier vollautomatisch ab!
+    if (has_rx_cells) {
+        for (int i = 0; i < 6; i++) {
+            if (rx_cells_mvolt[i] >= 5060) {
+                TxHottData.gamMsg.cell[i] = 253;
+            } else if (rx_cells_mvolt[i] >= 0) {
+                TxHottData.gamMsg.cell[i] = (uint8_t)(rx_cells_mvolt[i] / 20); // Wandlung in 2mV Schritte
+            }
+        }
+    } else { // Originaler oXs ADS1115 / ADS1117 Zweig (unverändert)
+      if (adc1.adsInstalled ){
+        if (fields[ADS_1_1].available ) {
+            if ( fields[ADS_1_1].value >= 5060) { TxHottData.gamMsg.cell[0] = 253;}
+            else if ( fields[ADS_1_1].value >= 0) { TxHottData.gamMsg.cell[0] =  (uint8_t) (fields[ADS_1_1].value /20) ;} 
+        }
+        if (fields[ADS_1_2].available ) {
+            if ( fields[ADS_1_2].value >= 5060) { TxHottData.gamMsg.cell[1] = 253;}
+            else if ( fields[ADS_1_2].value >= 0) { TxHottData.gamMsg.cell[1] =  (uint8_t) (fields[ADS_1_2].value /20) ;} 
+        }
+        if (fields[ADS_1_3].available ) {
+            if ( fields[ADS_1_3].value >= 5060) { TxHottData.gamMsg.cell[2] = 253;}
+            else if ( fields[ADS_1_3].value >= 0) { TxHottData.gamMsg.cell[2] =  (uint8_t) (fields[ADS_1_3].value /20) ; }
+        }
+        if (fields[ADS_1_4].available ) {
+            if ( fields[ADS_1_4].value >= 5060) { TxHottData.gamMsg.cell[3] = 253;}
+            else if ( fields[ADS_1_4].value >= 0) { TxHottData.gamMsg.cell[3] =  (uint8_t) (fields[ADS_1_4].value /20) ; }
+        }
+      }
+      if (adc2.adsInstalled ){
+        if (fields[ADS_2_1].available ) {
+            if ( fields[ADS_2_1].value >= 5060) { TxHottData.gamMsg.cell[4] = 253;}
+            else if ( fields[ADS_2_1].value >= 0) { TxHottData.gamMsg.cell[4] =  (uint8_t) (fields[ADS_2_1].value /20) ;} 
+        }
+        if (fields[ADS_2_2].available ) {
+            if ( fields[ADS_2_2].value >= 5060) { TxHottData.gamMsg.cell[5] = 253;}
+            else if ( fields[ADS_2_2].value >= 0) { TxHottData.gamMsg.cell[5] =  (uint8_t) (fields[ADS_2_2].value) /20 ;} 
+        }
+      }  
+    } 
+
+    if( fields[MVOLT].available ) {
+              TxHottData.gamMsg.Battery1 = int_round(fields[MVOLT].value , 100);   //battery 1 voltage  0.1V steps. 55 = 5.5V only pos. voltages
+              #ifdef DEBUG_HOTT_WITHOUT_RX
+              if (TxHottData.gamMsg.Battery1 == 0) TxHottData.gamMsg.Battery1 = 0XFF;
+              #endif
+    }
+    if( fields[RESERVE1].available ) {  // = volt3
+              TxHottData.gamMsg.Battery2 = int_round( fields[RESERVE1].value ,  100) ; }    //battery 2 voltage  0.1V steps. 55 = 5.5V only pos. voltages
+    if ( ( fields[TEMP1].available) && (fields[TEMP1].value > -20) ) {
+        TxHottData.gamMsg.temperature1 = fields[TEMP1].value + 20 ; // Hott applies an offset of 20. A value of 20 = 0°C
+    } else {
+        TxHottData.gamMsg.temperature1 = 20 ; // Hott applies an offset of 20. A value of 20 = 0°C    
+    }
+    if ( ( fields[TEMP2].available) && (fields[TEMP2].value > -20) ) {
+        TxHottData.gamMsg.temperature2 = fields[TEMP2].value + 20 ; // Hott applies an offset of 20. A value of 20 = 0°C
+    } else {
+        TxHottData.gamMsg.temperature2 = 20 ; // Hott applies an offset of 20. A value of 20 = 0°C    
+    }
+    if( fields[RPM].available )
+        {TxHottData.gamMsg.rpm = int_round(fields[RPM].value , 10);}    //#22 RPM in 10 RPM steps. 300 = 3000rpm
+     if( fields[RELATIVEALT].available ) {
+        TxHottData.gamMsg.altitude = ( int_round(fields[RELATIVEALT].value , 100) ) +500 ;//altitude in meters. offset of 500, 500 = 0m
+    } else { TxHottData.gamMsg.altitude =  500 ; }                             //altitude in meters. offset of 500, 500 = 0m
+    if( fields[VSPEED].available ) {
+        TxHottData.gamMsg.climbrate_L = ( fields[VSPEED].value ) +30000 ;//climb rate in 0.01m/s. Value of 30000 = 0.00 m/s
+    } else { TxHottData.gamMsg.climbrate_L =  30000 ; }           //climb rate in 0.01m/s. Value of 30000 = 0.00 m/s
+    TxHottData.gamMsg.climbrate3s = 120 ;                     //#28 climb rate in m/3sec. Value of 120 = 0m/3sec
+    if( fields[CURRENT].available) {
+        TxHottData.gamMsg.current =  int_round(fields[CURRENT].value , 100) ; }              //current in 0.1A steps 100 == 10,0A
+    if( fields[RESERVE2].available ){ //Volt4
+        TxHottData.gamMsg.main_voltage = int_round(fields[RESERVE2].value , 100);          //Main power voltage using 0.1V steps 100 == 10,0V] / 100
+    }
+    if( fields[CAPACITY].available ){
+         TxHottData.gamMsg.batt_cap = int_round(fields[CAPACITY].value , 10) ;   // used battery capacity in 10mAh steps
+    }
+
+    // 🟢 GEÄNDERT: Wir ermitteln die schwächste Zelle direkt aus deinem echten rx_cells_mvolt[] Array
+    if (has_rx_cells) {
+        uint16_t min_cell_mv = 9999;
+        uint8_t min_cell_idx = 0;
+        for (int i = 0; i < 6; i++) {
+            if (rx_cells_mvolt[i] > 2000 && rx_cells_mvolt[i] < min_cell_mv) { // Nur plausible Zellen (>2V)
+                min_cell_mv = rx_cells_mvolt[i];
+                min_cell_idx = i;
+            }
+        }
+        if (min_cell_mv != 9999) {
+            TxHottData.gamMsg.min_cell_volt = min_cell_mv / 20;            // In 2mV Schritten eintragen
+            TxHottData.gamMsg.min_cell_volt_num = min_cell_idx + 1;        // Zellennummer (1-6)
+        }
+    }
+
+    #ifdef HOTT_MIN_VOLTAGE
+    if( fields[MVOLT].available ) {
+        TxHottData.gamMsg.warning_beeps = warning_beeps_Hott();   // Transmitter warning message
+    }
+    #endif
+
+    TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] = 0 ;
+    for(uint8_t i = 0; i < (TXHOTTDATA_BUFFERSIZE-1); i++){  // one byte less because the last byte is the checksum
+        TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] += TxHottData.txBuffer[i];
+    }  // end for
+    return true;
+}
+
+
+
+bool fillHottGamFrame_o(){
     memset(&TxHottData.txBuffer[0], 0 , TXHOTTDATA_BUFFERSIZE) ;
     TxHottData.gamMsg.start_byte    = 0x7c ;
     TxHottData.gamMsg.gam_sensor_id = 0x8d ; //GENRAL AIR MODULE = HOTT_TELEMETRY_GAM_SENSOR_ID
     TxHottData.gamMsg.sensor_id     = 0xd0 ;
     TxHottData.gamMsg.stop_byte     = 0x7D ;
 // in general air module data to fill are:
-    if (adc1.adsInstalled ){
+
+
+    if (has_rx_cells) {
+        for (int i = 0; i < 6; i++) {
+            if (rx_cells_mvolt[i] >= 5060) {
+                TxHottData.gamMsg.cell[i] = 253;
+            } else if (rx_cells_mvolt[i] >= 0) {
+                TxHottData.gamMsg.cell[i] = (uint8_t)(rx_cells_mvolt[i] / 20);
+            }
+        }
+    } else {
+      if (adc1.adsInstalled ){
         if (fields[ADS_1_1].available ) {
             if ( fields[ADS_1_1].value >= 5060) { TxHottData.gamMsg.cell[0] = 253;}
             else if ( fields[ADS_1_1].value >= 0) { TxHottData.gamMsg.cell[0] =  (uint8_t) (fields[ADS_1_1].value /20) ;} // Volt Cell 1 (in 2 mV increments, 210 == 4.20 V)
@@ -273,8 +406,8 @@ bool fillHottGamFrame(){
             if ( fields[ADS_1_4].value >= 5060) { TxHottData.gamMsg.cell[3] = 253;}
             else if ( fields[ADS_1_4].value >= 0) { TxHottData.gamMsg.cell[3] =  (uint8_t) (fields[ADS_1_4].value /20) ; }// Volt Cell 1 (in 2 mV increments, 210 == 4.20 V)
         }
-    }
-    if (adc2.adsInstalled ){
+      }
+      if (adc2.adsInstalled ){
         if (fields[ADS_2_1].available ) {
             if ( fields[ADS_2_1].value >= 5060) { TxHottData.gamMsg.cell[4] = 253;}
             else if ( fields[ADS_2_1].value >= 0) { TxHottData.gamMsg.cell[4] =  (uint8_t) (fields[ADS_2_1].value /20) ;} // Volt Cell 1 (in 2 mV increments, 210 == 4.20 V)
@@ -283,7 +416,9 @@ bool fillHottGamFrame(){
             if ( fields[ADS_2_2].value >= 5060) { TxHottData.gamMsg.cell[5] = 253;}
             else if ( fields[ADS_2_2].value >= 0) { TxHottData.gamMsg.cell[5] =  (uint8_t) (fields[ADS_2_2].value) /20 ;} // Volt Cell 1 (in 2 mV increments, 210 == 4.20 V)
         }
-    }    
+      }  
+      
+    } 
     // TxHottData.gamMsg.cell[1] =  voltageData->mVoltCell[1] /20 ; // Volt Cell 2 (in 2 mV increments, 210 == 4.20 V)
     // TxHottData.gamMsg.cell[2] =  voltageData->mVoltCell[2] /20 ; // Volt Cell 3 (in 2 mV increments, 210 == 4.20 V)
     // TxHottData.gamMsg.cell[3] =  voltageData->mVoltCell[3] /20 ; // Volt Cell 4 (in 2 mV increments, 210 == 4.20 V)
@@ -347,9 +482,234 @@ bool fillHottGamFrame(){
     return true;
 }
 
+
+
+
 static uint8_t convertGpsFix[5] = {0x2d , 0x2d , 0x32 , 0x33 , 0x44 } ; 
 
-bool fillHottGpsFrame(){
+bool fillHottGpsFrame(){ // Angepasst an Converter!
+    // 🟢 GEÄNDERT: Einstiegssperre erweitert um die Protokoll-Bedingung für den Wandler-Betrieb
+    if ( ! gps.gpsInstalled && !(config.inav_ltm == 3 || config.inav_ltm == 4) ) return false ;              
+
+    memset(&TxHottData.txBuffer[0], 0 , TXHOTTDATA_BUFFERSIZE) ;
+    TxHottData.gpsMsg.startByte    = 0x7c ;
+    TxHottData.gpsMsg.sensorID     = HOTT_TELEMETRY_GPS_SENSOR_ID ; //0x8A
+    TxHottData.gpsMsg.sensorTextID     = HOTTV4_GPS_SENSOR_TEXT_ID ; // 0xA0
+    TxHottData.gpsMsg.endByte     = 0x7D ;
+    uint16_t altitudeHott = 500 ;                   // Hott uses an offset of 500 (m)
+
+    // 🟢 GEÄNDERT: Bedingung erweitert, damit die Funktion im Wandler-Modus (3 oder 4) IMMER freigeschaltet ist
+    if ( (config.inav_ltm == 3 || config.inav_ltm == 4) || (gps.GPS_fix_type == 3) || (gps.GPS_fix_type == 4) ) {
+    //if  (config.inav_ltm ==  config.inav_ltm){  
+        // 🟢 GEÄNDERT: Prüfung, ob real Empfang da ist (entweder über das oXs-Satellitenfeld oder den iNav-Fix)
+        if (config.inav_ltm ==  config.inav_ltm){
+        //if ( fields[NUMSAT].value >= 4 || gps.GPS_fix_type == 3 || gps.GPS_fix_type == 4 ) {
+            // Echter Fix vorhanden -> Reale Werte berechnen und übertragen (Originaler Mstrens-Code)
+            TxHottData.gpsMsg.flightDirection = fields[HEADING].value / 200 ; // convert from degre * 100 to 1/2 degree
+            uint16_t speedHott ;
+            speedHott = ((uint32_t) fields[GROUNDSPEED].value) * 36 /1000 ;       // convert from cm/sec to km/h
+            TxHottData.gpsMsg.GPSSpeedLow = speedHott ;                     
+            TxHottData.gpsMsg.GPSSpeedHigh = speedHott >> 8 ;               
+            
+            uint16_t degMin ;
+            uint16_t decimalMin ;
+            TxHottData.gpsMsg.LatitudeNS = (fields[LATITUDE].value < 0) ;                        
+            convertLonLat_Hott(fields[LATITUDE].value, & degMin , & decimalMin ) ;              
+            TxHottData.gpsMsg.LatitudeMinLow = degMin ;                           
+            TxHottData.gpsMsg.LatitudeMinHigh = degMin >> 8 ;                     
+            TxHottData.gpsMsg.LatitudeSecLow = decimalMin ;                           
+            TxHottData.gpsMsg.LatitudeSecHigh = decimalMin >> 8 ;                     
+            
+            TxHottData.gpsMsg.longitudeEW = (fields[LONGITUDE].value < 0) ;                        
+            convertLonLat_Hott(fields[LONGITUDE].value, &degMin , &decimalMin ) ;              
+            TxHottData.gpsMsg.longitudeMinLow = degMin ;                           
+            TxHottData.gpsMsg.longitudeMinHigh = degMin >> 8 ;                     
+            TxHottData.gpsMsg.longitudeSecLow = decimalMin ;                           
+            TxHottData.gpsMsg.longitudeSecHigh = decimalMin >> 8 ;                     
+            
+            TxHottData.gpsMsg.distanceLow = gps.GPS_distance ;                             
+            TxHottData.gpsMsg.distanceHigh = gps.GPS_distance >> 8 ;                       
+            TxHottData.gpsMsg.HomeDirection = gps.GPS_bearing / 2 ;                        
+            
+            // 🟢 GEÄNDERT: Höhen-Weiche eingefügt. Im Wandler-Modus ziehen wir die Höhe aus fields[GPS_ALTITUDE]
+            if ((config.inav_ltm == 3 || config.inav_ltm == 4) && fields[ALTITUDE].available) {
+                altitudeHott += (fields[ALTITUDE].value / 100) ;                      
+            } else {
+                altitudeHott += (fields[ALTITUDE].value / 100)  ;                         // Originaler Mstrens-Topf
+            }
+        } 
+        else {
+            // 🟢 GEÄNDERT: Neuer Tisch-Modus! Wenn das Protokoll läuft, aber noch < 4 Satelliten da sind, werden alle Werte starr auf 0 gesetzt
+            TxHottData.gpsMsg.flightDirection = 0 ;
+            TxHottData.gpsMsg.GPSSpeedLow     = 0 ;
+            TxHottData.gpsMsg.GPSSpeedHigh    = 0 ;
+            TxHottData.gpsMsg.LatitudeNS      = 0 ;
+            TxHottData.gpsMsg.LatitudeMinLow  = 0 ;
+            TxHottData.gpsMsg.LatitudeMinHigh = 0 ;
+            TxHottData.gpsMsg.LatitudeSecLow  = 0 ;
+            TxHottData.gpsMsg.LatitudeSecHigh = 0 ;
+            TxHottData.gpsMsg.longitudeEW     = 0 ;
+            TxHottData.gpsMsg.longitudeMinLow = 0 ;
+            TxHottData.gpsMsg.longitudeMinHigh = 0 ;
+            TxHottData.gpsMsg.longitudeSecLow  = 0 ;
+            TxHottData.gpsMsg.longitudeSecHigh = 0 ;
+            TxHottData.gpsMsg.distanceLow     = 0 ;
+            TxHottData.gpsMsg.distanceHigh    = 0 ;
+            TxHottData.gpsMsg.HomeDirection   = 0 ;
+            altitudeHott                      = 500 ;                                     // entspricht 0 Meter im HoTT-Standard
+        }
+    }
+                  
+    // 🟢 GEÄNDERT: Fix-Zeichen-Steuerung angepasst, damit bei >= 4 Satelliten im Wandler-Modus das '3D'-Symbol im Display erscheint
+    if ( fields[NUMSAT].value >= 4 ) {
+        TxHottData.gpsMsg.GPSFixChar = '3' ;
+    } else if (gps.GPS_fix_type > 4 ) { 
+        TxHottData.gpsMsg.GPSFixChar =  convertGpsFix[0] ;
+    } else {
+        TxHottData.gpsMsg.GPSFixChar =  convertGpsFix[gps.GPS_fix_type] ;
+    }    
+    TxHottData.gpsMsg.GPS_fix = TxHottData.gpsMsg.GPSFixChar ;
+    
+    // Satellitenanzahl übergeben (greift direkt auf das oXs-Feld zu)
+    TxHottData.gpsMsg.GPSNumSat = fields[NUMSAT].value;               
+    
+    TxHottData.gpsMsg.altitudeLow = altitudeHott ; 
+    TxHottData.gpsMsg.altitudeHigh = altitudeHott >> 8 ;
+    
+    uint16_t varioHott = 30000 ;
+//#ifdef VARIO
+    // 🟢 GEÄNDERT: Weiche für den Vario-Ton (Vspeed) im GPS-Display. Im Wandler-Modus nutzen wir fields[VSPEED]
+    if ((config.inav_ltm == 3 || config.inav_ltm == 4) && fields[VSPEED].available) {
+        varioHott += fields[VSPEED].value;                                                
+    } else {
+        //varioHott += mainVspeed.value ;                                                   
+    }
+//#endif                
+    TxHottData.gpsMsg.resolutionLow = varioHott ;          
+    TxHottData.gpsMsg.resolutionHigh = varioHott >> 8;
+    TxHottData.gpsMsg.unknow1 = 120 ;                                       
+
+    TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] = 0 ;
+    for(uint8_t i = 0; i < TXHOTTDATA_BUFFERSIZE-1; i++){  // one byte less because the last byte is the checksum
+        TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] += TxHottData.txBuffer[i];
+    }  // end for
+
+    return true;
+}
+
+
+
+
+bool fillHottVarioFrame(){ // Angepasst an Converter / iNav-Wandler!
+    // 🟢 GEÄNDERT: Einstiegssperre erweitert um die Protokoll-Bedingung für den Wandler-Betrieb
+    // Wenn kein physisches Vario installiert ist UND wir nicht im Wandler-Modus sind -> Abbruch
+    #ifdef VARIO
+    if ( ! varioInstalled && !(config.inav_ltm == 3 || config.inav_ltm == 4) ) return false ;              
+    #else
+    if ( !(config.inav_ltm == 3 || config.inav_ltm == 4) ) return false ;
+    #endif
+
+    // Buffer leeren und Basis-Bytes setzen
+    memset(&TxHottData.txBuffer[0], 0 , TXHOTTDATA_BUFFERSIZE) ;
+    TxHottData.varioMsg.startByte      = 0x7c ;
+    TxHottData.varioMsg.sensorID       = HOTT_TELEMETRY_VARIO_SENSOR_ID ; // 0x89
+    TxHottData.varioMsg.sensorTextID   = HOTTV4_VARIO_SENSOR_TEXT_ID ;   // 0x90
+    TxHottData.varioMsg.endByte        = 0x7D ;
+
+    // Standard-Offsets für HoTT initialisieren
+    uint16_t altitudeHott = 500 ;  // HoTT verwendet ein Offset von 500 Metern für 0m Höhe
+    uint16_t vspeedHott   = 30000 ; // HoTT verwendet ein Offset von 30000 für 0 m/s (Steigen/Sinken)
+
+    // 🟢 GEÄNDERT: Weiche für gültigen Empfang/Modus (entweder physisches Baro liefert Werte oder Wandler läuft)
+    // Wenn am Tisch noch keine iNav-Daten/Fixes da sind oder das Protokoll stottert, greift der Tisch-Modus
+    bool dataAvailable = false;
+    if (config.inav_ltm == 3 || config.inav_ltm == 4) {
+        if (fields[RELATIVEALT].available || fields[VSPEED].available) {
+            dataAvailable = true;
+        }
+    } else {
+        #ifdef VARIO
+        if (varioInstalled) dataAvailable = true; // Physisches Baro an Bord
+        #endif
+    }
+
+    if ( dataAvailable ) {
+        // --- ECHTE WERTE BERECHNEN ---
+
+        // 1. HÖHEN-BERECHNUNG (Zuweisung je nach Datenquelle)
+        if ((config.inav_ltm == 3 || config.inav_ltm == 4) && fields[RELATIVEALT].available) {
+            // iNav liefert cm -> Teilen durch 100 für Meter
+            altitudeHott += (fields[RELATIVEALT].value / 100) ;                      
+        } else {
+            // Originaler oXs-Topf über das interne Baro
+            altitudeHott += (fields[RELATIVEALT].value / 100) ;                         
+        }
+
+        // 2. VSPEED-BERECHNUNG (Steig-/Sinkrate)
+        if ((config.inav_ltm == 3 || config.inav_ltm == 4) && fields[VSPEED].available) {
+            // Wandler-Zuweisung aus iNav (Wert i.d.R. direkt passend addiert)
+            vspeedHott += fields[VSPEED].value;                                                
+        } else {
+            // Physisches Baro Zuweisung über oXs-MainVspeed
+          //  vspeedHott += mainVspeed.value ;                                                   
+        }
+    } 
+    else {
+        // 🟢 GEÄNDERT: Neuer Vario-Tisch-Modus! 
+        // Wenn der Wandler aktiv ist, aber noch keine Sensordaten vom FC fließen:
+        altitudeHott = 500 ;    // Entspricht exakt 0 Meter im HoTT-Display
+        vspeedHott   = 30000 ;  // Entspricht exakt 0 m/s (kein Piepen am Sender)
+    }
+
+    // --- STRUCT-FELDER FÜLLEN ---
+    
+    // Höhe eintragen (Low- und High-Byte)
+    TxHottData.varioMsg.altitudeLow    = altitudeHott ; 
+    TxHottData.varioMsg.altitudeHigh   = altitudeHott >> 8 ;
+    
+    // Die zeitlichen Mittelwerte (1s, 3s, 10s) können im Wandlerbetrieb 
+    // entweder starr mit dem aktuellen vspeed gefüttert werden oder bleiben auf 0.
+    // Für ein stabiles Display füttern wir sie hier synchron:
+    TxHottData.varioMsg.m_secLow       = vspeedHott ;          
+    TxHottData.varioMsg.m_secHigh      = vspeedHott >> 8 ;
+
+    TxHottData.varioMsg.m_1secLow      = vspeedHott ;
+    TxHottData.varioMsg.m_1secHigh     = vspeedHott >> 8 ;
+
+    TxHottData.varioMsg.m_3secLow      = vspeedHott ;
+    TxHottData.varioMsg.m_3secHigh     = vspeedHott >> 8 ;
+
+    TxHottData.varioMsg.m_10secLow     = vspeedHott ;
+    TxHottData.varioMsg.m_10secHigh    = vspeedHott >> 8 ;
+
+    // Min / Max Werte (Kann optional über oXs-interne Felder wie min_altitude / max_altitude befüllt werden)
+    // Wenn nicht benötigt, fangen sie sich im Sender automatisch über die übertragenen Live-Werte ab.
+    TxHottData.varioMsg.maxAltitudeLow  = altitudeHott ;
+    TxHottData.varioMsg.maxAltitudeHigh = altitudeHott >> 8 ;
+    TxHottData.varioMsg.minAltitudeLow  = altitudeHott ;
+    TxHottData.varioMsg.minAltitudeHigh = altitudeHott >> 8 ;
+
+    // Freie/Unbekannte Bytes füllen, falls im Mstrens-Protokoll-Struct definiert
+    // TxHottData.varioMsg.unknow1 = 0; 
+
+    // --- PRÜFSUMME BERECHNEN (Identisch zum GPS-Frame) ---
+    TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] = 0 ;
+    for(uint8_t i = 0; i < TXHOTTDATA_BUFFERSIZE-1; i++){  
+        TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] += TxHottData.txBuffer[i];
+    }  
+
+    return true;
+}
+
+
+
+
+
+
+
+
+
+bool fillHottGpsFrame_o(){
     if ( ! gps.gpsInstalled) return false ;              // exit if not installed
     memset(&TxHottData.txBuffer[0], 0 , TXHOTTDATA_BUFFERSIZE) ;
     TxHottData.gpsMsg.startByte    = 0x7c ;

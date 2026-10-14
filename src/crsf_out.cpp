@@ -18,7 +18,7 @@
 #include <inttypes.h>
 #include "mpu.h"
 
-#define FRAME_TYPES_MAX 5
+#define FRAME_TYPES_MAX 7
 uint32_t crsfFrameNextMillis[FRAME_TYPES_MAX] = {0} ; 
 uint8_t crsf_last_frame_idx = 0 ;  
 
@@ -91,6 +91,8 @@ void fillCRSFFrame(){
 
 
 bool dataAvailable(uint8_t idx) {
+    extern bool has_rx_cells; 
+    
     switch (idx) {
         case  CRSF_FRAMEIDX_BATTERY_SENSOR : 
             return fields[MVOLT].available || fields[CURRENT].available || fields[CAPACITY].available  ;
@@ -99,10 +101,15 @@ bool dataAvailable(uint8_t idx) {
         case CRSF_FRAMEIDX_ATTITUDE :
             return  fields[PITCH].available || fields[ROLL].available ;           
         case CRSF_FRAMEIDX_GPS :
-            return gps.gpsInstalled ;   
+            return (gps.gpsInstalled || config.inav_ltm == 3 || config.inav_ltm == 4) ;   
             //return gps.gpsInstalled || baro1.baroInstalled ; //gps.GPS_lonAvailable ;  // gps.gpsInstalled || baro1.baroInstalled 
         case CRSF_FRAMEIDX_BARO_ALTITUDE :
             return fields[RELATIVEALT].available ;        
+        case CRSF_FRAMEIDX_VOLTAGES:
+            if (config.inav_ltm == 3 || config.inav_ltm == 4) {
+                return true; 
+            }
+            return has_rx_cells;
     }
     return false;
     // to be continue with other frames/data if ELRS support them.
@@ -273,7 +280,11 @@ void fillFrameGps(uint8_t idx){
         //}
         fillBufferU16( (uint16_t) (1000 + fields[ALTITUDE].value / 100 )) ;     //( converted to cm in gps.cpp and here from cm to m and an offset of 1000 m )
         fillBufferU8( (uint8_t) fields[NUMSAT].value );       //( counter including +100 when 3D fix )
-        fields[NUMSAT].available = false;
+        //fields[NUMSAT].available = false;
+
+        if (!(config.inav_ltm == 3 || config.inav_ltm == 4)) {
+            fields[NUMSAT].available = false;
+        }
     //} else {
     //    fillBufferI32( 0u );    // lat
     //    fillBufferI32( 0u );    // long
@@ -302,6 +313,123 @@ void fillFrameGps(uint8_t idx){
     dma_channel_set_trans_count (crsf_dma_chan, CRSFBufferLength, true) ;    
 }
 
+void fillFrameVoltages_o(uint8_t idx) {
+    extern uint16_t rx_cells_mvolt[];
+    extern bool has_rx_cells;
+
+    // DYNAMISCHE ERKENNUNG: Wir zählen, wie viele Zellen der Sensor real liefert
+    // (rx_cells_mvolt hat im oXs-Standard Platz für bis zu 12 oder 14 Zellen)
+    uint8_t total_cells = 0;
+    for (int i = 0; i < 14; i++) { // Scannt das Array bis max. 14S ab
+        if (rx_cells_mvolt[i] > 2000) { 
+            total_cells = i + 1; // Merkt sich den höchsten belegten Zellen-Index
+        }
+    }
+
+    // Sicherheits-Fallback für den Schreibtisch-Test ohne Akku:
+    //if (total_cells == 0) total_cells = 6; 
+
+    CRSFBufferLength = 0;
+    fillBufferU8( CRSF_ADDRESS_CRSF_RECEIVER );
+    
+    // DYNAMISCHE LÄNGE: 1 Byte Typ (0x0E) + (Zellen * 2 Bytes) + 1 Byte CRC
+    uint8_t payload_size = 1 + (total_cells * 2) + 1;
+    fillBufferU8( payload_size ); 
+    fillBufferU8( 0x0E ); // CRSF_FRAMETYPE_VOLTAGES
+    
+    fillBufferU8( 0 ); // Voltage_source_id (0 = Batterie 1 Einzelzellen)
+
+    // Wir packen die exakte Anzahl an erkannten Zellen nacheinander hinein (Big Endian)
+    for (int i = 0; i < total_cells; i++) {
+        uint16_t cell_crsf = 0;
+        if (has_rx_cells && rx_cells_mvolt[i] > 2000) {
+            cell_crsf = rx_cells_mvolt[i]; // mV in 10mV-Schritte wandeln (4200mV -> 420)
+        } else {
+            //cell_crsf = 200; // Fallback: Wenn keine Zellen verfügbar, setzen wir auf 2ß0
+        }
+        fillBufferU16( cell_crsf ); 
+    }
+
+    // Die Länge der zu berechnenden Daten ist: 1 Byte Typ + (Zellen * 2)
+    fillBufferU8( crsf_crc_out.calc( &CRSFBuffer[2] , 1 + (total_cells * 2)) );
+
+    // Nächstes Sendeintervall festlegen
+    crsfFrameNextMillis[idx] = millisRp() + 150;
+
+    if ( debugTlm == 'Y' ){
+        printf("Voltages 0x0E (S=%u): ", total_cells);
+        for (uint8_t i = 0; i < CRSFBufferLength ; i++) printf( " %02X ", CRSFBuffer[i]);
+        printf("\n"); fflush(stdout);
+    }    
+    
+    dma_channel_set_read_addr (crsf_dma_chan, &CRSFBuffer[0], false);
+    dma_channel_set_trans_count (crsf_dma_chan, CRSFBufferLength, true) ;    
+}
+
+void fillFrameVoltages(uint8_t idx) {
+    extern uint16_t rx_cells_mvolt[];
+    extern bool has_rx_cells;
+
+    // 1. Zellen zählen
+    uint8_t total_cells = 0;
+    for (int i = 0; i < 14; i++) {
+        if (rx_cells_mvolt[i] > 2000) { 
+            total_cells = i + 1;
+        }
+    }
+
+    // Wenn keine Zellen da sind, senden wir das Paket gar nicht erst,
+    // um ein "Verschwinden" oder korrupte 0V-Sensoren in EdgeTX zu vermeiden.
+    if (total_cells == 0 || !has_rx_cells) return;
+
+    CRSFBufferLength = 0;
+    
+    // Byte 0: Device Address (Empfänger)
+    fillBufferU8( CRSF_ADDRESS_CRSF_RECEIVER ); 
+    
+    // Byte 1: Payload-Länge = 1 Byte Typ + 1 Byte Source_ID + (Zellen * 2 Bytes) + 1 Byte CRC
+    // Beispiel 4S: 1 + 1 + 8 + 1 = 11 Bytes
+    uint8_t payload_size = 1 + 1 + (total_cells * 2) + 1;
+    fillBufferU8( payload_size ); 
+
+    // Ab hier (Byte Index 2) beginnt die CRC8-Berechnung!
+    fillBufferU8( 0x0E ); // Byte 2: CRSF_FRAMETYPE_VOLTAGES
+    fillBufferU8( 0x00 ); // Byte 3: Voltage_source_id (0 = Batterie 1 Einzelzellen)
+
+    // Bytes 4+: Die Zellen-Spannungen direkt in Millivolt (Big Endian)
+    for (int i = 0; i < total_cells; i++) {
+        uint16_t cell_crsf = rx_cells_mvolt[i]; 
+        fillBufferU16( cell_crsf ); 
+    }
+
+    // CRC BERECHNUNG CRUCIAL CHECK:
+    // Die CRC wird ab Byte 2 (&CRSFBuffer[2]) berechnet.
+    // Die Länge der zu prüfenden Bytes ist: Typ (1) + Source_ID (1) + (Zellen * 2).
+    uint8_t crc_len = 1 + 1 + (total_cells * 2);
+    fillBufferU8( crsf_crc_out.calc( &CRSFBuffer[2] , crc_len ) );
+
+    // Nächstes Sendeintervall (z.B. alle 200ms reicht für Einzelzellen völlig)
+    crsfFrameNextMillis[idx] = millisRp() + 200;
+
+    if ( debugTlm == 'Y' ){
+        printf("Voltages 0x0E (S=%u): ", total_cells);
+        for (uint8_t i = 0; i < CRSFBufferLength ; i++) printf( " %02X ", CRSFBuffer[i]);
+        printf("\n"); fflush(stdout);
+    }    
+    
+    dma_channel_set_read_addr (crsf_dma_chan, &CRSFBuffer[0], false);
+    dma_channel_set_trans_count (crsf_dma_chan, CRSFBufferLength, true) ;    
+}
+
+
+
+
+
+
+
+
+
+
 void fillOneFrame(uint8_t idx){
     //printf("frame: %X\n", idx);
     switch (idx) {
@@ -320,7 +448,9 @@ void fillOneFrame(uint8_t idx){
         case CRSF_FRAMEIDX_BARO_ALTITUDE :
             fillFrameBaroAltitude(idx);
             break ;
-                           
+        case CRSF_FRAMEIDX_VOLTAGES :
+            fillFrameVoltages(idx);
+            break ;                   
     } // end switch
 }
 

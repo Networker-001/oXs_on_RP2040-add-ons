@@ -4,14 +4,20 @@
 #include "inav_ltm.h"
 #include "param.h"
 #include "tools.h"
+#include <stdint.h>
+#include <stdbool.h>
 
+// 🟢 KORREKTUR: Wir binden die echten oXs-Core-Header ein
+#include "param.h"
+#include "tools.h"
 #define INAV_UART uart1
 #define INAV_BAUDRATE 19200
 
 // =================================================================
 // ADAPTION: GLOBALE SPEICHER-SCHUBLADEN DIESES LTM-SENSOR-MODULS
 // =================================================================
-int32_t live_alt = 100; // Startwert 1 Meter für HoTT-Init
+int32_t live_alt = 0; // Startwert 1 Meter für HoTT-Init
+int32_t live_alt_rel = 0;
 int32_t live_mvolt = 0;
 int32_t live_current = 0;
 int32_t live_speed = 0;
@@ -23,6 +29,9 @@ int32_t live_roll = 0;
 int32_t live_heading = 0;
 uint8_t live_flight_mode = 0;
 uint8_t live_is_armed    = 0;    
+int32_t live_lat = 0;
+int32_t live_lon = 0;
+
 
 bool has_mvolt = false;
 bool has_current = false;
@@ -31,9 +40,18 @@ bool has_sat = false;
 bool has_rpm = false;
 bool has_cap = false;
 bool has_alt = false;
+bool has_alt_rel = false;
+bool has_lat = false;
+bool has_lon = false;
+bool has_pitch = false;
+bool has_roll = false;
+bool has_head = false;
 
+extern VARIO vario1;
 
 extern field fields[];
+
+extern bool ltm_data_rx_flag;
 
 // Initialisiert die UART-Schnittstelle fuer den nativen iNav LTM-Empfang (Normal/Nicht-Invertiert!)
 void init_inav_ltm() {
@@ -192,9 +210,179 @@ void parse_inav_ltm() {
                         fields[AIRSPEED].value     = ltm_airspeed; 
                         fields[AIRSPEED].available = true;
                     }
+                                    // =========================================================
+                    // 🟢 DIE RETTUNG FÜR MODUS 1: Das Flag zünden!
+                    // Sobald IRGENDEIN Frame die CRC-Prüfung fehlerfrei 
+                    // passiert hat, schalten wir dein LED-Flag sofort scharf.
+                    // =========================================================
+                    ltm_data_rx_flag = true;     
                 }
                 state = 0;                                    
                 break;
         }
     }
 }
+
+
+void getSensors_ltm_o(void) {
+    // Sagt dem Compiler, dass diese Variablen in der inav_ltm.cpp liegen
+    extern int32_t live_alt;
+    extern int32_t live_mvolt;
+    extern int32_t live_current;
+    extern int32_t live_speed;
+    extern int32_t live_sat;
+    extern int32_t live_cap;
+    extern int32_t live_pitch;
+    extern int32_t live_roll;
+    extern int32_t live_heading;
+    extern uint8_t live_flight_mode;
+    extern uint8_t live_is_armed;
+
+    static bool ledInit = false;
+    /*if (!ledInit) {
+        gpio_init(25);
+        gpio_set_dir(25, GPIO_OUT);
+        ledInit = true;
+    }*/
+
+    // =================================================================
+    // SCHRITT 1: DIE WERTE HOLEN
+    // =================================================================
+    if (config.inav_ltm == 1)  {
+        live_alt = 100; 
+        live_mvolt = 0;
+        live_current = 0;
+        live_speed = 0;
+        live_sat = 0;
+        live_rpm = 0;
+        live_cap = 0;
+        live_pitch = 0;
+        live_roll = 0;
+        live_heading = 0;
+
+        has_alt = false;
+        has_mvolt = false;
+        has_current = false;
+        has_speed = false;
+        has_sat = false;
+        has_rpm = false;
+        has_cap = false;
+
+        bool altWasAvailable = fields[ALTITUDE].available;
+        bool voltWasAvailable = fields[MVOLT].available;
+
+        parse_inav_ltm();
+
+        if (fields[ALTITUDE].available)    { live_alt = fields[ALTITUDE].value; has_alt = true; }
+        if (fields[MVOLT].available)       { live_mvolt = fields[MVOLT].value; has_mvolt = true; }
+        if (fields[CURRENT].available)     { live_current = fields[CURRENT].value; has_current = true; }
+        if (fields[GROUNDSPEED].available) { live_speed = fields[GROUNDSPEED].value; has_speed = true; }
+        if (fields[NUMSAT].available)      { live_sat = fields[NUMSAT].value; has_sat = true; }
+        if (fields[RPM].available)         { live_rpm = fields[RPM].value; has_rpm = true; }
+        if (fields[CAPACITY].available)    { live_cap = fields[CAPACITY].value; has_cap = true; }
+        if (fields[PITCH].available)       { live_pitch = fields[PITCH].value; }
+        if (fields[ROLL].available)        { live_roll = fields[ROLL].value; }
+        if (fields[HEADING].available)     { live_heading = fields[HEADING].value; }
+        if (fields[TEMP1].available)       { live_flight_mode = fields[TEMP1].value; }
+        if (fields[TEMP2].available)       { live_is_armed = fields[TEMP2].value; }
+
+        if (fields[ALTITUDE].available == altWasAvailable && fields[MVOLT].available == voltWasAvailable) {
+            gpio_put(25, (millisRp() % 1000 < 500)); 
+        } else {
+            gpio_put(25, (millisRp() % 60 < 30)); 
+        }
+    } 
+    else if (config.inav_ltm == 2) {
+        live_alt         = 15000;    
+        live_mvolt       = 12400;    
+        live_current     = 1500;     
+        live_speed       = 4500;     
+        live_sat         = 9;        
+        live_rpm         = 3200;     
+        live_pitch       = 10;       
+        live_roll        = 5;        
+        live_heading     = 180;      
+        live_cap         = 850;  
+        live_flight_mode = 13;
+        live_is_armed    = 1;
+    }
+    else if (config.inav_ltm == 3 || config.inav_ltm == 4) {
+        // Holt sich die Werte von Core 1 ab
+        live_alt         = fields[ALTITUDE].value;       
+        live_mvolt       = fields[MVOLT].value;    
+        live_current     = fields[CURRENT].value;     
+        live_speed       = fields[GROUNDSPEED].value;     
+        live_sat         = fields[NUMSAT].value;        
+        live_rpm         = fields[RPM].value;     
+        live_pitch       = fields[PITCH].value;       
+        live_roll        = fields[ROLL].value;        
+        live_heading     = fields[HEADING].value;      
+        live_cap         = fields[CAPACITY].value;      
+        live_flight_mode = fields[TEMP1].value;
+        live_is_armed    = fields[TEMP2].value;
+    } // <-- HIER WIRD DER FR-SKY BLOCK JETZT SAUBER GESCHLOSSEN!
+
+    // =================================================================
+    // SCHRITT 1B: DIE GLOBALE SPIEGELUNG FÜR ALLE MODI (FÜR HOTT/JETI)
+    // =================================================================
+    fields[ALTITUDE].value     = live_alt;       
+    if (config.inav_ltm != 3 && config.inav_ltm != 4) {
+        // Macht das Spiegeln nur für Modus 1 und 2, um FrSky nicht zu stören
+        fields[MVOLT].value        = live_mvolt;    
+        fields[CURRENT].value      = live_current;     
+        fields[GROUNDSPEED].value  = live_speed;     
+        fields[NUMSAT].value       = live_sat;        
+        fields[RPM].value          = live_rpm;     
+        fields[PITCH].value        = live_pitch;       
+        fields[ROLL].value         = live_roll;        
+        fields[HEADING].value      = live_heading;      
+        fields[CAPACITY].value     = live_cap;      
+    }
+    fields[TEMP1].value        = live_flight_mode;
+    fields[TEMP2].value        = live_is_armed;
+
+    // =================================================================
+    // SCHRITT 2: DAS DAUERFEUER DER FLAGS ERZWINGEN (Für alle Modi!)
+    // =================================================================
+    fields[ALTITUDE].available    = true; 
+    fields[MVOLT].available       = true;
+    fields[CURRENT].available     = true; 
+    fields[GROUNDSPEED].available = true;
+    fields[NUMSAT].available      = true; 
+    fields[RPM].available         = true;
+    fields[PITCH].available       = true; 
+    fields[ROLL].available        = true;
+    fields[HEADING].available     = true; 
+    fields[CAPACITY].available    = true;
+    fields[TEMP1].available       = true; 
+    fields[TEMP2].available       = true;
+
+    fields[ALTITUDE].onceAvailable    = true;
+    fields[MVOLT].onceAvailable       = true;
+    fields[CURRENT].onceAvailable     = true;
+    fields[GROUNDSPEED].onceAvailable = true;
+    fields[NUMSAT].onceAvailable      = true;
+    fields[PITCH].onceAvailable       = true;
+    fields[ROLL].onceAvailable        = true;
+    fields[HEADING].onceAvailable     = true;
+    fields[CAPACITY].onceAvailable    = true;
+    fields[TEMP1].onceAvailable       = true;
+    fields[TEMP2].onceAvailable       = true;
+    
+    // Vario-Berechnung synchron halten
+    vario1.calculateAltVspeed(fields[ALTITUDE].value, 200000);
+    fields[VSPEED].available = true;
+
+    // HoTT-Pflichtfeld-Spiegelung für das GAM-Modul
+    fields[RELATIVEALT].value     = fields[ALTITUDE].value;
+    fields[RELATIVEALT].available = true;
+    fields[RESERVE2].value        = fields[MVOLT].value;
+    fields[RESERVE2].available    = true;
+
+    fields[VSPEED].value = 0;
+    fields[VSPEED].available = true;
+    fields[VSPEED].onceAvailable = true; 
+
+
+}
+

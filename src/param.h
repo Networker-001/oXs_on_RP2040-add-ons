@@ -87,6 +87,7 @@ struct CONFIG{
     uint8_t pinE220Busy;
     //uint8_t pin_tramp;          // Tramp Telemetrie Pin             inav2ltm
     uint8_t inav_ltm;           // 0 = Deaktiviert, 1 = Aktiviert   inav2ltm
+    uint8_t inav_ltm_pin;   // 🟢 NEU: Speichert deinen Input-Pin (erlaubt: 2 bis 4)
 };
 
 void handleUSBCmd(void);
