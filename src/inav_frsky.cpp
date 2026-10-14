@@ -520,8 +520,8 @@ void decode0x820(int32_t val) { // GPS Höhe
 
     // Ziehe die Basishöhe ab, um die echte relative Höhe (Start bei 0 cm) zu erhalten
     live_alt = val ;  //- alt_offset;
-    setField(fields[ALTITUDE], live_alt); // - alt_offset);
-    //setField(fields[ALTITUDE], fields[RELATIVEALT].value);
+    //setField(fields[ALTITUDE], live_alt); // - alt_offset);
+    setField(fields[ALTITUDE], fields[RELATIVEALT].value);
 
     if  ( ! fields[RELATIVEALT].available) {
         // Wenn die relative Höhe bereits verfügbar ist, aktualisieren wir sie
