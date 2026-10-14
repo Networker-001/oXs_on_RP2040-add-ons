@@ -82,6 +82,7 @@ static const uint8_t s_port_search_ids[] = {
 //#define DEBUGINAV3
 extern uint8_t debugTlm;
 extern uint8_t debugVal;
+extern uint8_t debugAll;
 // 🟢 KORREKTUR: Wir nutzen den echten oXs-Typ FIELD (Großbuchstaben)
 // Damit weiß der Compiler exakt, wie das oXs-Array aufgebaut ist.
 extern field fields[]; 
@@ -179,6 +180,72 @@ static bool receive_software_uart_byte(uint8_t *received_byte) {
     }
     return false;
 }
+
+
+void printAllTelemetryValues() {
+     if (debugAll != 'Y') return;
+
+    // Taktung fest auf 10-mal pro Sekunde (100 ms) einbremsen
+    static uint32_t lastPrintTime = 0;
+    uint32_t currentTime = to_ms_since_boot(get_absolute_time()); 
+
+    if (currentTime - lastPrintTime < 300) { 
+        return; 
+    }
+    lastPrintTime = currentTime; 
+
+    // Prüfung auf die erste Zeile / den ersten Durchlauf
+    static bool isFirstOutput = true;
+
+    if (isFirstOutput) {
+        // Beim allerersten Start machen wir KEINE Leerzeilen.
+        // Die Tabelle beginnt direkt ganz oben im Terminal-Fenster.
+        isFirstOutput = false; 
+    } else {
+        // Ab dem zweiten Durchlauf schieben wir den alten Block mit 
+        // exakt 45 Leerzeilen nach oben aus dem Sichtfeld weg.
+        for (uint8_t i = 0; i < 45; i++) {
+            printf("\n");
+        }
+    }
+
+    // Kopfzeile (beißt jetzt starr oben an)
+    printf("=== oXs RP2040 Telemetry Live-Monitor (10 Hz) ===\n");
+    printf("---------------------------------------------------\n");
+
+    // Deine erweiterte Komma-Liste
+    #define TELEMETRY_FIELDS \
+        X(LATITUDE), X(LONGITUDE), X(ALTITUDE), X(RELATIVEALT), X(GROUNDSPEED), X(HEADING), \
+        X(NUMSAT), X(GPS_DATE), X(GPS_TIME), X(GPS_HOME_DISTANCE), X(VSPEED), X(PITCH), X(ROLL), \
+        X(YAW), X(RPM), X(CURRENT), X(CAPACITY), X(TEMP1), X(TEMP2), X(MVOLT), \
+        X(ADS_1_1), X(ADS_1_2), X(ADS_1_3), X(ADS_1_4), X(ADS_2_1), X(ADS_2_2), X(ADS_2_3), X(ADS_2_4)
+
+    // Das Auswertungs-Makro: Reiner Standard-Text untereinander.
+    #define X(id) ([&]() { \
+        if (fields[id].available) { \
+            printf(" %-18s | Value: %-15ld\n", #id, (int32_t)fields[id].value); \
+        } else if (fields[id].onceAvailable) { \
+            printf(" %-18s | [Stale] %-15ld\n", #id, (int32_t)fields[id].value); \
+        } else { \
+            printf(" %-18s | [Not Available]\n", #id); \
+        } \
+        return 0; \
+    }())
+
+    // Array-Trick ausführen, damit der Compiler deine Liste zeilenweise abarbeitet
+    int dummy[] = { TELEMETRY_FIELDS };
+    (void)dummy; 
+
+    printf("---------------------------------------------------\n");
+    
+    // Makros nach dem Durchlauf sofort wieder freigeben
+    #undef X
+    #undef TELEMETRY_FIELDS
+
+    fflush(stdout); // Datenblock im Ganzen auf die USB-Schnittstelle schieben
+}
+
+
 
 // Definition (z. B. ganz oben in der Datei)
 #define setField(f, v) do { \
@@ -723,6 +790,8 @@ void read_frsky_sensors_core1(void) {
                 // schalten wir SOFORT wieder aus. Das erzeugt das perfekte Blitzen!
                 // =============================================================
                 setRgbColorOn(0, 0, 0); 
+
+                printAllTelemetryValues();
             } 
             else {
                 // Wenn das Fenster abgelaufen ist und KEIN gültiges Paket kam,

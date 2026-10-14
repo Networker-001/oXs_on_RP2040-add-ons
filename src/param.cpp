@@ -72,6 +72,7 @@ extern uint32_t lastRcChannels;
 CONFIG config;
 uint8_t debugTlm = 'N';
 uint8_t debugVal = 'N';
+uint8_t debugAll = 'N';
 
 uint8_t debugSbusOut = 'N';
 uint8_t debugAccZ = 'N';
@@ -240,7 +241,7 @@ void printHelp(){
     printf("   Display raw Acc Z        DEBUGACCZ = Y or N  display vertical acc (useful to check offsets)\n");
     printf("   Testing                  FV                  Field Values (display all telemetry internal values)\n")  ;
     printf("                            FVP                 Field Values Positieve (force the tlm values to positieve dummy values\n")  ;
-    printf("                            FVN                      idem with negatieve values\n")  ;
+    printf("                            FVN                 idem with negatieve values\n")  ;
 
 
     // =================================================================
@@ -279,6 +280,7 @@ void printHelp(){
     printf("     FV                 : Show telemetrie values once \n")  ;
     printf("     DT = Y             : Show incomming FRSKY pakets \n")  ;
     printf("     DV = Y             : Show incomming FRSKY values \n")  ;
+    printf("     DA = Y             : Show incomming FRSKY values \n")  ;
 
     printf("------------------------------------------\n\n")  ;
 
@@ -682,6 +684,19 @@ int8_t handleOneCmd( char * bufferPos){ // handle one command with buffer starti
             return 0; 
         } else  {
             printf("Error : DEBUGVAL must be Y or N\n");
+        }
+    }   
+
+     // change debugTlm values
+    if (( strcmp("DEBUGALL", pkey) == 0 ) || ( strcmp("DA", pkey) == 0 ) ){ // if the key is DEBUGTLM
+        if (strcmp("Y", pvalue) == 0) {
+            debugAll = 'Y';
+            return 0;
+        } else if (strcmp("N", pvalue) == 0) {
+            debugAll = 'N';
+            return 0; 
+        } else  {
+            printf("Error : DEBUGALL must be Y or N\n");
         }
     }   
 
