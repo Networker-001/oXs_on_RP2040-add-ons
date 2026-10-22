@@ -44,6 +44,7 @@ extern ADS1115 adc1;
 extern ADS1115 adc2;
 extern uint16_t rx_cells_mvolt[];
 extern bool has_rx_cells;
+extern bool has_alt;
 
 // one pio and 2 state machines are used to manage the hott bus in halfduplex
 // one state machine (sm) handle the TX and the second the RX
@@ -266,13 +267,31 @@ bool fillHottGamFrame(){
     // 🟢 ABSOLUT VERLÄSSLICH: Da dein Parser rx_cells_mvolt[] füllt und has_rx_cells setzt,
     // greift Mstrens' originaler Code deine LiPo-Zellen hier vollautomatisch ab!
     if (has_rx_cells) {
-        for (int i = 0; i < 6; i++) {
+        /*for (int i = 0; i < 6; i++) {
             if (rx_cells_mvolt[i] >= 5060) {
                 TxHottData.gamMsg.cell[i] = 253;
             } else if (rx_cells_mvolt[i] >= 0) {
                 TxHottData.gamMsg.cell[i] = (uint8_t)(rx_cells_mvolt[i] / 20); // Wandlung in 2mV Schritte
             }
+        }*/
+
+        for (int i = 0; i < 6; i++) {
+            int field_index = ADS_1_1 + i;
+            int32_t cell_mvolt = fields[field_index].value;
+
+            if (cell_mvolt >= 5060) {
+                TxHottData.gamMsg.cell[i] = 253; // HoTT-Maximalwertschutz
+            } else if (cell_mvolt > 0) { 
+                // 🟢 Umrechnung in HoTT-Format: Graupner erwartet den Wert in 20mV-Schritten!
+                // Hinweis: (Spannung in mV / 20) ergibt exakt die von HoTT geforderten 0.02V Schritte.
+                TxHottData.gamMsg.cell[i] = (uint8_t)(cell_mvolt / 20); 
+            } else {
+                TxHottData.gamMsg.cell[i] = 0; // Keine Zelle vorhanden
+            }
         }
+
+
+
     } else { // Originaler oXs ADS1115 / ADS1117 Zweig (unverändert)
       if (adc1.adsInstalled ){
         if (fields[ADS_1_1].available ) {
@@ -331,8 +350,10 @@ bool fillHottGamFrame(){
         TxHottData.gamMsg.climbrate_L = ( fields[VSPEED].value ) +30000 ;//climb rate in 0.01m/s. Value of 30000 = 0.00 m/s
     } else { TxHottData.gamMsg.climbrate_L =  30000 ; }           //climb rate in 0.01m/s. Value of 30000 = 0.00 m/s
     TxHottData.gamMsg.climbrate3s = 120 ;                     //#28 climb rate in m/3sec. Value of 120 = 0m/3sec
+   
     if( fields[CURRENT].available) {
-        TxHottData.gamMsg.current =  int_round(fields[CURRENT].value , 100) ; }              //current in 0.1A steps 100 == 10,0A
+        TxHottData.gamMsg.current =  int_round(fields[CURRENT].value , 100) ;}       //current in 0.1A steps 100 == 10,0A
+    
     if( fields[RESERVE2].available ){ //Volt4
         TxHottData.gamMsg.main_voltage = int_round(fields[RESERVE2].value , 100);          //Main power voltage using 0.1V steps 100 == 10,0V] / 100
     }
@@ -444,6 +465,7 @@ bool fillHottGamFrame_o(){
     }
     if( fields[RPM].available )
         {TxHottData.gamMsg.rpm = int_round(fields[RPM].value , 10);}    //#22 RPM in 10 RPM steps. 300 = 3000rpm
+
     if( fields[RELATIVEALT].available ) {
         TxHottData.gamMsg.altitude = ( int_round(fields[RELATIVEALT].value , 100) ) +500 ;//altitude in meters. offset of 500, 500 = 0m
     } else { TxHottData.gamMsg.altitude =  500 ; }                             //altitude in meters. offset of 500, 500 = 0m
@@ -453,7 +475,12 @@ bool fillHottGamFrame_o(){
     } else { TxHottData.gamMsg.climbrate_L =  30000 ; }           //climb rate in 0.01m/s. Value of 30000 = 0.00 m/s
     TxHottData.gamMsg.climbrate3s = 120 ;                     //#28 climb rate in m/3sec. Value of 120 = 0m/3sec
     if( fields[CURRENT].available) {
-        TxHottData.gamMsg.current =  int_round(fields[CURRENT].value , 100) ; }              //current in 0.1A steps 100 == 10,0A
+            uint16_t test_current = 100; // entspricht 10.0A
+      // Bytes für Big-Endian vertauschen:
+        TxHottData.gamMsg.current = (uint16_t)((test_current >> 8) | (test_current << 8));}
+
+
+    //    TxHottData.gamMsg.current =  1 /10;} // int_round(fields[CURRENT].value , 100) ; }              //current in 0.1A steps 100 == 10,0A
     if( fields[RESERVE2].available ){ //Volt4
         TxHottData.gamMsg.main_voltage = int_round(fields[RESERVE2].value , 100);          //Main power voltage using 0.1V steps 100 == 10,0V] / 100
     }
@@ -489,7 +516,8 @@ static uint8_t convertGpsFix[5] = {0x2d , 0x2d , 0x32 , 0x33 , 0x44 } ;
 
 bool fillHottGpsFrame(){ // Angepasst an Converter!
     // 🟢 GEÄNDERT: Einstiegssperre erweitert um die Protokoll-Bedingung für den Wandler-Betrieb
-     if ( ! gps.gpsInstalled && !(config.inav_ltm == 3 || config.inav_ltm == 4) ) return false ;              
+    extern bool GpsAlt;
+     if ( ! gps.gpsInstalled &&  !(config.inav_ltm == 3 || config.inav_ltm == 4 ) ) return false ;         //&& !(config.inav_ltm == 3 || config.inav_ltm == 4 ) &&  ! has_alt       
 
     memset(&TxHottData.txBuffer[0], 0 , TXHOTTDATA_BUFFERSIZE) ;
     TxHottData.gpsMsg.startByte    = 0x7c ;

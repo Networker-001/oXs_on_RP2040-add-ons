@@ -95,16 +95,16 @@ bool dataAvailable(uint8_t idx) {
     
     switch (idx) {
         case  CRSF_FRAMEIDX_BATTERY_SENSOR : 
-            return fields[MVOLT].available || fields[CURRENT].available || fields[CAPACITY].available  ;
+            return fields[MVOLT].available || fields[CURRENT].available || fields[CAPACITY].available || config.inav_ltm == 3 || config.inav_ltm == 4 ;
         case CRSF_FRAMEIDX_VARIO :
-            return fields[VSPEED].available ;    
+            return fields[VSPEED].available || config.inav_ltm == 3 || config.inav_ltm == 4;    
         case CRSF_FRAMEIDX_ATTITUDE :
             return  fields[PITCH].available || fields[ROLL].available ;           
         case CRSF_FRAMEIDX_GPS :
             return (gps.gpsInstalled || config.inav_ltm == 3 || config.inav_ltm == 4) ;   
             //return gps.gpsInstalled || baro1.baroInstalled ; //gps.GPS_lonAvailable ;  // gps.gpsInstalled || baro1.baroInstalled 
         case CRSF_FRAMEIDX_BARO_ALTITUDE :
-            return fields[RELATIVEALT].available ;        
+            return fields[RELATIVEALT].available || config.inav_ltm == 3 || config.inav_ltm == 4;        
         case CRSF_FRAMEIDX_VOLTAGES:
             if (config.inav_ltm == 3 || config.inav_ltm == 4) {
                 return true; 
@@ -160,7 +160,7 @@ void fillFrameBattery(uint8_t idx){
     if ( fields[CURRENT].value > 0 ) {
         fillBufferU16((uint16_t) int_round(fields[CURRENT].value, 100)) ; // convert from mA to 0.1A
     } else fillBufferU16(0);
-    if ( fields[CAPACITY].value > 0 ) {
+    if ( fields[CAPACITY].available) {
         fillBufferU24( (uint32_t) fields[CAPACITY].value);
     } else fillBufferU24(0);
     //if ( fields[REMAIN].value > 0 ) {
@@ -372,11 +372,20 @@ void fillFrameVoltages(uint8_t idx) {
 
     // 1. Zellen zählen
     uint8_t total_cells = 0;
-    for (int i = 0; i < 14; i++) {
+    /*for (int i = 0; i < 14; i++) {
         if (rx_cells_mvolt[i] > 2000) { 
             total_cells = i + 1;
         }
+    }*/
+    // 🟢 NEU: Zellen direkt aus den oXs-Feldern zählen (ADS_1_1 bis ADS_2_2)
+    // Wir prüfen maximal 6 Zellen (Index 0 bis 5) entsprechend Ihrer oXs-Enum-Struktur
+    for (int i = 0; i < 6; i++) {
+        int field_index = ADS_1_1 + i;
+        if (fields[field_index].value > 2000) { 
+            total_cells = i + 1;
+        }
     }
+
 
     // Wenn keine Zellen da sind, senden wir das Paket gar nicht erst,
     // um ein "Verschwinden" oder korrupte 0V-Sensoren in EdgeTX zu vermeiden.
@@ -397,10 +406,25 @@ void fillFrameVoltages(uint8_t idx) {
     fillBufferU8( 0x00 ); // Byte 3: Voltage_source_id (0 = Batterie 1 Einzelzellen)
 
     // Bytes 4+: Die Zellen-Spannungen direkt in Millivolt (Big Endian)
-    for (int i = 0; i < total_cells; i++) {
+    /*for (int i = 0; i < total_cells; i++) {
         uint16_t cell_crsf = rx_cells_mvolt[i]; 
         fillBufferU16( cell_crsf ); 
+    }*/
+    
+    // 🟢 Bytes 4+: Die Zellen-Spannungen direkt aus den oXs-Feldern lesen und in den Puffer schreiben (Big Endian)
+    for (int i = 0; i < total_cells; i++) {
+       // Ermittelt den passenden Feld-Index (ADS_1_1 ist Zelle 1, ADS_1_2 Zelle 2, etc.)
+       int field_index = ADS_1_1 + i; 
+    
+       // Holt den echten gemessenen Millivolt-Wert aus der oXs-Struktur
+       uint16_t cell_crsf = (uint16_t)fields[field_index].value; 
+    
+    // Schreibt den Wert in den Ausgabe-Puffer
+       fillBufferU16( cell_crsf ); 
     }
+
+
+
 
     // CRC BERECHNUNG CRUCIAL CHECK:
     // Die CRC wird ab Byte 2 (&CRSFBuffer[2]) berechnet.

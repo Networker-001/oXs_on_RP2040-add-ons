@@ -270,7 +270,7 @@ extern bool calibrateImuGyro ; // recalibrate the gyro or not at reset (avoid it
 
 #include "pico/util/queue.h"
 
-
+bool GpsAlt = false; // Flag to indicate if GPS altitude is available
 
 // Wir nutzen die von mstrens initialisierte Rx-Queue
 extern queue_t fbusRxQueue; 
@@ -944,12 +944,13 @@ void setup() {
 }
 
 void loop() {
-  //debugBootButton();
-    //startTimerUs(MAIN_LOOP);                            // start a timer to measure enlapsed time
 
 
 
-  if (((configIsValid) and (configIsSaved)) or (config.inav_ltm >= 1)) {
+    // 2. Phase: Nach 4 Sekunden schaltet der normale oXs-Ablauf ein
+    if (((configIsValid) and (configIsSaved)) or (config.inav_ltm >= 1)) {
+
+
 
 
       // =================================================================
@@ -959,10 +960,12 @@ void loop() {
           getSensors_ltm();     // Verarbeitet Einlesen, Tischtest & Dauerfeuer direkt auf Core 0
           handle_ltm_led_core1();
 
-        } else {
+      } else {
           getSensorsFromCore1(); // Holt im Normalmodus die Hardware-Sensoren von Core 1
 
       }
+      printAllTelemetryValues();
+
       // =================================================================
    
       //mergeSeveralSensors();
@@ -1028,7 +1031,9 @@ void loop() {
       if ((config.pinLogger != 255) && (newRcChannelsReceivedForLogger)) { // when logger is on and new RC data have been converted in uint16
         newRcChannelsReceivedForLogger = false; // reset the flag allowing a log of RC channels
         logger.logAllRcChannels();  // log all rc channels
-      }       
+      }    
+      
+       
   }
   //alarmTimerUs(MAIN_LOOP, 1000);    //  print a warning if enlapsed time exceed xx usec
 
@@ -1047,6 +1052,9 @@ void loop() {
         blinking = false; // setRgbColorOn(10,0,0);
         setRgbOn();  
     }*/
+    
+   
+
   }
 
 
@@ -1086,9 +1094,25 @@ void loop() {
  
 }
 
-int main(){
+int main_o(){
   setup();
   while(1) loop();
+}
+
+int main() {
+    setup();
+    
+    while(1) {
+        // Solange wir in den ersten 4 Sekunden sind, überspringen wir den loop()
+        if (millisRp() < 4000) {
+            watchdog_update(); // Verhindert den Hardware-Reset des RP2040
+            waitUs(1000);      // 1 Millisekunde Pause im Leerlauf
+            continue;          // Springt sofort wieder an den Anfang der while(1)
+        }
+        
+        // Erst nach 4 Sekunden wird der normale oXs-Loop ausgeführt
+        loop();
+    }
 }
 
 
@@ -1120,7 +1144,7 @@ void loop1() {
 
     // Wenn inav_ltm == 0 ist, läuft die originale oXs-Sensorverarbeitung
     if (config.inav_ltm == 0) {
-
+        
         getSensors(); // get sensor
 
         if (config.pinSpiCs != 255) {
@@ -1165,11 +1189,27 @@ void loop1() {
 }
 
 
-void core1_main(){
+void core1_main_o(){
     setup1();
     while(1) loop1();
 }
 
+void core1_main() {
+    setup1();
+    
+    while(1) {
+        // Solange wir in den ersten 4 Sekunden sind, überspringen wir loop1()
+        if (millisRp() < 4000) {
+            // Hier erlauben wir Core 1 im Hintergrund sicher zu atmen,
+            // ohne dass er die zeitkritischen Sensor-Loops triggert.
+            waitUs(1000); 
+            continue; // Springt sofort wieder an den Anfang der while(1)
+        }
+        
+        // Erst nach 4 Sekunden starten die Core-1-Sensoren und Tasks
+        loop1();
+    }
+}
 
 
 

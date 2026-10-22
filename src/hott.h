@@ -136,7 +136,88 @@ typedef struct {
   uint8_t version;                         //#43 version number (Bytes 35 .43 new but not yet in the record in the display!)
   uint8_t stop_byte;                       //#44 stop byte 0x7D
   uint8_t parity;                          //#45 CHECKSUM CRC/Parity (calculated dynamicaly)
-} __attribute__((__packed__)) HOTT_GAM_MSG ;
+} __attribute__((__packed__)) HOTT_GAM_MSG; // 45 bytes;
+
+// structure of GENERAL AIR MODULE 
+typedef struct {
+  uint8_t start_byte;          //#01 start byte constant value 0x7c
+  uint8_t gam_sensor_id;       //#02 EAM sensort id. constat value 0x8d=GENRAL AIR MODULE
+  uint8_t warning_beeps;       //#03 1=A 2=B ... 0x1a=Z  0 = no alarm
+                  /* VOICE OR BIP WARNINGS
+                    Alarme sonore A.. Z, octet correspondant 1 à 26
+                    0x00  00  0  No alarm
+                    0x01  01  A  
+                    0x02  02  B  Negative Difference 2 B
+                    0x03  03  C  Negative Difference 1 C
+                    0x04  04  D  
+                    0x05  05  E  
+                    0x06  06  F  Min. Sensor 1 temp. F
+                    0x07  07  G  Min. Sensor 2 temp. G
+                    0x08  08  H  Max. Sensor 1 temp. H
+                    0x09  09  I  Max. Sensor 2 temp. I
+                    0xA   10  J  Max. Sens. 1 voltage J
+                  0xB   11  K  Max. Sens. 2 voltage K
+                  0xC   12  L  
+                  0xD   13  M  Positive Difference 2 M
+                  0xE   14  N  Positive Difference 1 N
+                  0xF   15  O  Min. Altitude O
+                  0x10  16  P  Min. Power Voltage P    // We use this one for Battery Warning
+                  0x11  17  Q  Min. Cell voltage Q
+                  0x12  18  R  Min. Sens. 1 voltage R
+                  0x13  19  S  Min. Sens. 2 voltage S
+                  0x14  20  T  Minimum RPM T
+                  0x15  21  U  
+                  0x16  22  V  Max. used capacity V
+                  0x17  23  W  Max. Current W
+                  0x18  24  X  Max. Power Voltage X
+                  0x19  25  Y  Maximum RPM Y
+                  0x1A  26  Z  Max. Altitude Z
+                        */
+  uint8_t sensor_id;                       //#04 constant value 0xd0 for GAM, other values for other modules
+  uint8_t alarm_invers1;                   //#05 alarm bitmask. Value is displayed inverted
+              //Bit#  Alarm field
+            // 0    all cell voltage
+            // 1    Battery 1
+            // 2    Battery 2
+            // 3    Temperature 1
+            // 4    Temperature 2
+            // 5    Fuel
+            // 6    mAh
+            // 7    Altitude
+  uint8_t alarm_invers2;        //#06 alarm bitmask. Value is displayed inverted
+  uint8_t cell[6];              //#07 bis #12 Volt Cell 1-6
+  uint16_t Battery1;            //#13 LSB, #14 MSB
+  uint16_t Battery2;            //#15 LSB, #16 MSB
+  uint8_t temperature1;         //#17 Temperature 1
+  uint8_t temperature2;         //#18 Temperature 2
+  
+  // HIER WAR DER FEHLER: fuel_ml GIBT ES IM GAM NICHT!
+  uint8_t fuel_procent;         //#19 Fuel capacity in % (1 Byte)
+  
+  uint16_t rpm;                 //#20 LSB, #21 MSB (Achtung, Nummern verschieben sich!)
+  uint16_t altitude;            //#22 LSB, #23 MSB
+  uint16_t climbrate_L;         //#24 LSB, #25 MSB
+  uint8_t climbrate3s;          //#26 climb rate in m/3sec
+  
+  // current sitzt jetzt exakt an Byte-Position 27/28 (0-indiziert) im Graupner-Standard
+  uint16_t current;             //#27 LSB, #28 MSB in 0.1A steps
+  uint16_t main_voltage;        //#29 LSB, #30 MSB
+  uint16_t batt_cap;                    //#33 LSB used battery capacity in 10mAh steps
+                                        //#34 MSB 
+  uint16_t speed;                       //#35 LSB (air?) speed in km/h(?) we are using ground speed here per default
+                                        //#36 MSB speed
+  uint8_t min_cell_volt;                   //#37 minimum cell voltage in 2mV steps. 124 = 2,48V
+  uint8_t min_cell_volt_num;               //#38 number of the cell with the lowest voltage
+  uint16_t rpm2;                        //#39 LSB 2nd RPM in 10 RPM steps. 100 == 1000rpm
+                                        //#40 MSB
+  uint8_t general_error_number;            //#41 General Error Number (Voice Error == 12) TODO: more documentation
+  uint8_t pressure;                        //#42 High pressure up to 16bar. 0,1bar scale. 20 == 2.0bar
+  uint8_t version;                         //#43 version number (Bytes 35 .43 new but not yet in the record in the display!)
+  uint8_t stop_byte;                       //#44 stop byte 0x7D
+  uint8_t parity;                          //#45 CHECKSUM CRC/Parity (calculated dynamicaly)
+} __attribute__((__packed__)) HOTT_GAM_MSG_NEW; // 45 bytes;
+
+
 
 //GPS
 typedef struct {

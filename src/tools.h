@@ -130,7 +130,7 @@ uint32_t swapBinary(uint32_t value) ;
 int32_t swapBinary(int32_t value) ;
 
 
-#define DO_DEBUG
+//#define DO_DEBUG
 extern int debug ; // set from conf file at runtime
 #ifdef DO_DEBUG
   #define debugP(fmt, ...)  do { if(debug == 1){printf((fmt), ##__VA_ARGS__);} } while (0)

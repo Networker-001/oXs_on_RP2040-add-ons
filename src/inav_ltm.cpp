@@ -41,6 +41,7 @@ bool has_rpm = false;
 bool has_cap = false;
 bool has_alt = false;
 bool has_alt_rel = false;
+bool has_alt_uni = false;
 bool has_lat = false;
 bool has_lon = false;
 bool has_pitch = false;
