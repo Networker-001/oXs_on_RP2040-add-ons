@@ -104,6 +104,8 @@ extern field fields[];
 int8_t FRSKY_PIN1 = 2; 
 extern CONFIG config; 
 
+extern bool ltm_data_rx_flag;
+
 // Globales Lipo-Array für die Einzelzellen (Einheit: Millivolt)
 volatile uint16_t rx_cells_mvolt[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -426,6 +428,25 @@ void printAllTelemetryValues_o() {
 
 
 
+
+
+#include "hardware/sync.h" // Wichtig für hardware_spinlock
+
+#define MIN_INTERVAL_MS 10  // Gewünschte Mindestpause zwischen Updates eines Feldes
+
+
+
+
+// Das neue Makro nutzt den Pointer-Trick, um den Index im fields-Array zu bestimmen
+#define setField(f, v) do { \
+    sent2Core0((&(f) - fields), (int32_t)(v)); \
+    if (debugVal == 'Y') { \
+        printf("\r %-25s | Value: %8ld        ", #f, (int32_t)(v)); \
+        fflush(stdout); \
+    } \
+} while(0)
+
+
 // FELDER setzen
 #define setField_o(f, v) do { \
     (f).value = (v); \
@@ -437,15 +458,6 @@ void printAllTelemetryValues_o() {
     } \
 } while(0)
 
-#include "hardware/sync.h" // Wichtig für hardware_spinlock
-
-#define MIN_INTERVAL_MS 10  // Gewünschte Mindestpause zwischen Updates eines Feldes
-
-#include "hardware/sync.h" // Zwingend erforderlich für Hardware-Spinlocks
-
-#define MIN_INTERVAL_MS 10  // Mindestpause zwischen Updates eines einzelnen Feldes
-
-#include "hardware/sync.h"
 
 // Das Makro ist jetzt federleicht und blockiert absolut gar nichts mehr!
 #define setField_n(f, v) do { \
@@ -468,16 +480,6 @@ void printAllTelemetryValues_o() {
     (f).value = (v); \
     (f).available = true; \
     (f).onceAvailable = true; \
-    if (debugVal == 'Y') { \
-        printf("\r %-25s | Value: %8ld        ", #f, (int32_t)(v)); \
-        fflush(stdout); \
-    } \
-} while(0)
-
-
-// Das neue Makro nutzt den Pointer-Trick, um den Index im fields-Array zu bestimmen
-#define setField(f, v) do { \
-    sent2Core0((&(f) - fields), (int32_t)(v)); \
     if (debugVal == 'Y') { \
         printf("\r %-25s | Value: %8ld        ", #f, (int32_t)(v)); \
         fflush(stdout); \
@@ -1445,15 +1447,18 @@ void read_frsky_sensors_core1(void) {
                 setRgbColorOn(0, 0, 0); 
 
                 //printAllTelemetryValues();
+                ltm_data_rx_flag = true;
             } 
             else {
                 // Wenn das Fenster abgelaufen ist und KEIN gültiges Paket kam,
                 // schalten wir sie hier ebenfalls stur aus, damit sie glimmt.
                 setRgbColorOn(0, 0, 0); 
+               ltm_data_rx_flag = false;
             }
 
             scheduler_step++;
             if (scheduler_step >= 4) scheduler_step = 0; 
+
         }
     }
 }
@@ -1726,8 +1731,8 @@ void simulate_all_sensors_flexible() {
     setField(fields[NUMSAT], sim_sats);
 
     // --- 3. HARDWARE-BLINKTAKTSYNC ---
-    if ((now / 150) % 2 == 0) { setRgbColorOn(0, 1, 0); } else { setRgbColorOn(0, 0, 0); }
-    // printAllTelemetryValues();
+    if ((now / 1500) % 2 == 0) { setRgbColorOn(0, 1, 0); } else { setRgbColorOn(0, 0, 0); }
+    // printAllTelemetryValues();*/
 }
 
 
@@ -1890,12 +1895,12 @@ void simulate_frsky_sensors_core1() {
             fields[RESERVE2].value        = fields[MVOLT].value;
             fields[RESERVE2].available    = true; fields[RESERVE2].onceAvailable = true;
             
-            if (now % 1000 < 500) {
+           /* if (now % 1000 < 500) {
                 if ((now / 12) % 4 == 0) { setRgbColorOn(0, 1, 0); } else { setRgbColorOn(0, 0, 0); }
             } else { setRgbColorOn(0, 0, 0); }
 
             static uint32_t last_sim_toggle = 0;
-            if (now - last_sim_toggle >= 150) { last_sim_toggle = now; led_state = !led_state; }
+            if (now - last_sim_toggle >= 150) { last_sim_toggle = now; led_state = !led_state; }*/
         }
        
     }
