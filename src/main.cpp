@@ -574,7 +574,7 @@ void handle_ltm_led_core1() {
     static uint32_t last_packet_time = 0;
     uint32_t ms = to_ms_since_boot(get_absolute_time());
 
-    if ((config.inav_ltm == 2) )  {
+    if ((config.inav_ltm == 2)||(config.inav_ltm == 4)  )  {
         static bool pause_eingeleitet = false; // Merker für die Pause
 
         if (ms % 50 < 10){
@@ -606,7 +606,7 @@ void handle_ltm_led_core1() {
     // 🟢 DIE PHYSIKALISCHE RETTUNG FÜR MODUS 1 (INTELLIGENTES SUCH-BLINKEN):
     // Frei von blockierenden Treibersperren. Rechnet stur im sauberen Takt!
     // =========================================================================
-    else if (config.inav_ltm == 1) {
+    else if (config.inav_ltm == 1 || config.inav_ltm == 3) {
         // Wir prüfen dein originales Parser-Flag
         if (ltm_data_rx_flag == true) {
             last_packet_time = ms;
@@ -657,8 +657,6 @@ void handle_ltm_led_core1() {
 }
 
 void getSensors_ltm(void) {
-    extern int32_t live_alt, live_mvolt, live_current, live_speed, live_sat, live_cap, live_pitch, live_roll, live_heading;
-    extern uint8_t live_flight_mode, live_is_armed;
 
     uint32_t now_ms = millisRp(); // Holt den Millisekunden-Takt von Core 0
     uint32_t now = to_ms_since_boot(get_absolute_time());
@@ -670,124 +668,22 @@ void getSensors_ltm(void) {
     // MODUS 1: LTM Echtbetrieb über den Hardware-UART
     // =========================================================================
     if (config.inav_ltm == 1)  {
-        live_alt = 100; live_mvolt = 0; live_current = 0; live_speed = 0; live_sat = 0;
-        live_rpm = 0; live_cap = 0; live_pitch = 0; live_roll = 0; live_heading = 0;
-
-        has_alt = has_mvolt = has_current = has_speed = has_sat = has_rpm = has_cap = false;
 
         bool altWasAvailable = fields[ALTITUDE].available;
         bool voltWasAvailable = fields[MVOLT].available;
 
         parse_inav_ltm(); // Rattert durch deinen LTM Seriell-Parser
 
-        if (fields[ALTITUDE].available)    { live_alt = fields[ALTITUDE].value; has_alt = true; }
-        if (fields[MVOLT].available)       { live_mvolt = fields[MVOLT].value; has_mvolt = true; }
-        if (fields[CURRENT].available)     { live_current = fields[CURRENT].value; has_current = true; }
-        if (fields[GROUNDSPEED].available) { live_speed = fields[GROUNDSPEED].value; has_speed = true; }
-        if (fields[NUMSAT].available)      { live_sat = fields[NUMSAT].value; has_sat = true; }
-        if (fields[RPM].available)         { live_rpm = fields[RPM].value; has_rpm = true; }
-        if (fields[CAPACITY].available)    { live_cap = fields[CAPACITY].value; has_cap = true; }
-        if (fields[PITCH].available)       { live_pitch = fields[PITCH].value; }
-        if (fields[ROLL].available)        { live_roll = fields[ROLL].value; }
-        if (fields[HEADING].available)     { live_heading = fields[HEADING].value; }
-        if (fields[TEMP1].available)       { live_flight_mode = fields[TEMP1].value; }
-        if (fields[TEMP2].available)       { live_is_armed = fields[TEMP2].value; }
 
-        // 🔵 INTELLIGENTES LTM-ECHTZEIT-BLAU:
-        if (fields[ALTITUDE].available != altWasAvailable || fields[MVOLT].available != voltWasAvailable) {
-            // Ein frisches Paket wurde decodiert! Wir setzen das Signal und flashen matt Blau (Stufe 1)
-           // last_ltm_packet_ms = now_ms;
-            //setRgbColorOn(0, 0, 1); 
-        } else {
-            // Wenn länger als 200ms kein iNav-Paket kam -> Gedimmtes Leerlauf-Glimmen über die Zeitachse
-           /* if (now_ms - last_ltm_packet_ms >= 200) {
-                if ((now_ms / 12) % 50 == 0) {
-                    setRgbColorOn(0, 0, 1); // Ganz kurz matt Blau
-                } else {
-                    setRgbColorOn(0, 0, 0); // Aus
-                }
-            } else {
-                // Sofortiger Takt-Rücksprung nach dem Paket-Blitz
-                setRgbColorOn(0, 0, 0); 
-            }*/
-        }
     } 
     // =========================================================================
     // MODUS 2: LTM Simulationsbetrieb am Schreibtisch
     // =========================================================================
     else if (config.inav_ltm == 2) {
-        live_alt         = 15000;    
-        live_mvolt       = 12400;    
-        live_current     = 1500;     
-        live_speed       = 4500;     
-        live_sat         = 9;        
-        live_rpm         = 3200;     
-        live_pitch       = 10;       
-        live_roll        = 5;        
-        live_heading     = 180;      
-        live_cap         = 850;  
-        live_flight_mode = 13;
-        live_is_armed    = 1;
 
-
+        simulate_all_sensors_ltm();
     }
-    // =========================================================================
-    // MODUS 3 / 4: FrSky-Betrieb (Werte von Core 1 abholen, LED schläft hier!)
-    // =========================================================================
-    else if (config.inav_ltm == 3 || config.inav_ltm == 4) {
-        live_alt         = fields[ALTITUDE].value;       
-        live_mvolt       = fields[MVOLT].value;    
-        live_current     = fields[CURRENT].value;     
-        live_speed       = fields[GROUNDSPEED].value;     
-        live_sat         = fields[NUMSAT].value;        
-        live_rpm         = fields[RPM].value;     
-        live_pitch       = fields[PITCH].value;       
-        live_roll        = fields[ROLL].value;        
-        live_heading     = fields[HEADING].value;      
-        live_cap         = fields[CAPACITY].value;      
-        live_flight_mode = fields[TEMP1].value;
-        live_is_armed    = fields[TEMP2].value;
-    } 
-
-    // Spiegelung und unberührter originaler Flag-Wust (Absolut identisch!)
-    fields[ALTITUDE].value     = live_alt;       
-    if (config.inav_ltm != 3 && config.inav_ltm != 4) {
-        fields[MVOLT].value        = live_mvolt;    
-        fields[CURRENT].value      = live_current;     
-        fields[GROUNDSPEED].value  = live_speed;     
-        fields[NUMSAT].value       = live_sat;        
-        fields[RPM].value          = live_rpm;     
-        fields[PITCH].value        = live_pitch;       
-        fields[ROLL].value         = live_roll;        
-        fields[HEADING].value      = live_heading;      
-        fields[CAPACITY].value     = live_cap;      
-    }
-    fields[TEMP1].value        = live_flight_mode;
-    fields[TEMP2].value        = live_is_armed;
-
-    fields[ALTITUDE].available    = fields[MVOLT].available       = fields[CURRENT].available     = true; 
-    fields[GROUNDSPEED].available = fields[NUMSAT].available      = fields[RPM].available         = true; 
-    fields[PITCH].available       = fields[ROLL].available        = fields[HEADING].available     = true; 
-    fields[CAPACITY].available    = fields[TEMP1].available       = fields[TEMP2].available       = true;
-
-    fields[ALTITUDE].onceAvailable    = fields[MVOLT].onceAvailable       = fields[CURRENT].onceAvailable     = true;
-    fields[GROUNDSPEED].onceAvailable = fields[NUMSAT].onceAvailable      = fields[PITCH].onceAvailable       = true;
-    fields[ROLL].onceAvailable        = fields[HEADING].onceAvailable     = fields[CAPACITY].onceAvailable    = true;
-    fields[TEMP1].onceAvailable       = fields[TEMP2].onceAvailable       = fields[RPM].onceAvailable         = true;
     
-    vario1.calculateAltVspeed(fields[ALTITUDE].value, 200000);
-    fields[VSPEED].available = true;
-
-    fields[RELATIVEALT].value     = fields[ALTITUDE].value;
-    fields[RELATIVEALT].available = true;
-    fields[RESERVE2].value        = fields[MVOLT].value;
-    fields[RESERVE2].available    = true;
-
-    fields[VSPEED].value = 0;
-    fields[VSPEED].available = fields[VSPEED].onceAvailable = true; 
-
-    
-    //setRgbColorOn(0, 0, 20);
 }
 
 
@@ -957,17 +853,19 @@ void loop() {
       // STRATEGISCHE SINGLE-CORE WEICHE
       // =================================================================
       if ((config.inav_ltm == 1) || (config.inav_ltm == 2) ) {
-          getSensors_ltm();     // Verarbeitet Einlesen, Tischtest & Dauerfeuer direkt auf Core 0
+          //getSensors_ltm();     // Verarbeitet Einlesen, Tischtest & Dauerfeuer direkt auf Core 0
           handle_ltm_led_core1();
 
       } else {
-          getSensorsFromCore1(); // Holt im Normalmodus die Hardware-Sensoren von Core 1
-
+          
+          //handle_ltm_led_core1();
       }
+      getSensorsFromCore1(); // Holt im Normalmodus die Hardware-Sensoren von Core 1
       printAllTelemetryValues();
 
       // =================================================================
    
+
       //mergeSeveralSensors();
       watchdog_update();
       if ( config.protocol == 'C'){   //elrs/crsf
@@ -1125,7 +1023,7 @@ void setup1(){
     
     if ((config.inav_ltm == 3)||(config.inav_ltm == 4 ) ) {
 	  setupLed();									// Status-LED initialisieren
-	  setRgbColorOn(0, 10, 0);						// LED auf Grün schalten während Setup
+	  setRgbColorOn(2, 0, 0);						// LED auf Grün schalten während Setup
     }
 
     if (config.inav_ltm >= 3 ) { // iNav LTM Telemetrie
@@ -1144,7 +1042,7 @@ void loop1() {
 
     // Wenn inav_ltm == 0 ist, läuft die originale oXs-Sensorverarbeitung
     if (config.inav_ltm == 0) {
-        
+
         getSensors(); // get sensor
 
         if (config.pinSpiCs != 255) {
@@ -1170,29 +1068,22 @@ void loop1() {
         }
     } // <-- Hier schließt mstrens das obere "if (config.inav_ltm == 0)"
 
+    //  MODUS 1 & 2: Altes LTM-Live und LTM-Tischtest (Übergibt die LED-Arbeit an Core 1)
+    else if (config.inav_ltm == 1)  {parse_inav_ltm();}
+       // handle_ltm_led_core1();
+
+    else if(config.inav_ltm == 2) { simulate_all_sensors_ltm();}
+    
     // Wenn inav_ltm == 3 ist, läuft dein FrSky-Sensor-Modus völlig exklusiv
-    if (config.inav_ltm == 3) {
-        read_frsky_sensors_core1();
-    }
+    else if(config.inav_ltm == 3) {read_frsky_sensors_core1();    }
 
     // NEU - TESTMODUS: Künstliche Daten ohne Sensor erzeugen
-    if (config.inav_ltm == 4) {
-        simulate_frsky_sensors_core1();
-    }
+    else if(config.inav_ltm == 4) {simulate_frsky_sensors_core1();}
 
-        //  MODUS 1 & 2: Altes LTM-Live und LTM-Tischtest (Übergibt die LED-Arbeit an Core 1)
-    if ((config.inav_ltm == 1) || (config.inav_ltm == 2)) {
-       // handle_ltm_led_core1();
-    }
     
     //alarmTimerUs(MAIN_LOOP1, 500);
 }
 
-
-void core1_main_o(){
-    setup1();
-    while(1) loop1();
-}
 
 void core1_main() {
     setup1();
@@ -1211,5 +1102,10 @@ void core1_main() {
     }
 }
 
+
+void core1_main_o(){
+    setup1();
+    while(1) loop1();
+}
 
 

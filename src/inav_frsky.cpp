@@ -49,7 +49,7 @@
 
 // SW Version
 
-int SW_Version = 39;
+int SW_Version = 42;
 
 //=====================================================================
 
@@ -98,6 +98,8 @@ static const uint8_t s_port_search_ids[] = {
 extern uint8_t debugTlm;
 extern uint8_t debugVal;
 extern uint8_t debugAll;
+extern uint8_t debugFrS;
+
 // 🟢 KORREKTUR: Wir nutzen den echten oXs-Typ FIELD (Großbuchstaben)
 // Damit weiß der Compiler exakt, wie das oXs-Array aufgebaut ist.
 extern field fields[]; 
@@ -299,14 +301,27 @@ void printAllTelemetryValues() {
             int32_t frac = abs(rawVal % 1000);
             snprintf(valBuffer, sizeof(valBuffer), "%ld.%03ld", mainUnit, frac);
         }
-        else if (id == ALTITUDE || id == RELATIVEALT || id == VSPEED || id == HEADING) {
+       /* else if (id == ALTITUDE || id == VSPEED || id == HEADING) {                 //  || id == RELATIVEALT 
             // 2 Nachkommastellen (Meter aus cm, m/s aus cm/s, Grad aus 0.01 Grad)
             int32_t mainUnit = rawVal / 10000000; // oXs nutzt intern für Alt oft Skalierung, hier angepasst auf Standard-cm
             // Hinweis: Falls deine oXs Version cm liefert, hier durch 100 teilen:
             mainUnit = rawVal / 100;
             int32_t frac = abs(rawVal % 100);
             snprintf(valBuffer, sizeof(valBuffer), "%ld.%02ld", mainUnit, frac);
+        }*/
+        else if (id == ALTITUDE || id == RELATIVEALT || id == VSPEED || id == HEADING) {                 
+            // Hinweis: Falls deine oXs Version cm liefert, hier durch 100 teilen:
+            int32_t mainUnit = rawVal / 100;
+            int32_t frac = abs(rawVal % 100);
+    
+            // Prüfen, ob der Wert negativ ist (auch wenn mainUnit zu 0 wird)
+            if (rawVal < 0) {
+                snprintf(valBuffer, sizeof(valBuffer), "-%ld.%02ld", abs(mainUnit), frac);
+            } else {
+                snprintf(valBuffer, sizeof(valBuffer), "%ld.%02ld", mainUnit, frac);
+            }
         }
+
         else if (id == GPS_DATE) {
             // Formatierung TT.MM.JJ
             int32_t day = rawVal / 1000000;
@@ -499,9 +514,9 @@ uint16_t filterFrSkyId(uint16_t originaleId) {
  * @return Die bereinigte ID für das Switch-Case, oder 0 wenn das Paket verworfen werden muss.
  */
 
-
+ 
     // GPS und andere IDs ab 0x0800 werden ungefiltert durchgewinkt
-    if ((originaleId >= 0x0800 && (originaleId & 0xFFF0) != 0x0880 && (originaleId & 0xFFF0) != 0x0B60) || (originaleId & 0xFFF0) == 0x0300){
+    if ((originaleId >= 0x0800 && (originaleId & 0xFFF0) != 0x0880 && (originaleId & 0xFFF0) != 0x0B60 && (originaleId & 0xFFF0) != 0x0A10  )|| (originaleId & 0xFFF0) == 0x0300 ){
         return originaleId;
     }
 
@@ -511,14 +526,14 @@ uint16_t filterFrSkyId(uint16_t originaleId) {
     // --- SCHICHT 1: INDEX-ERKENNUNG (Nur beim allerersten indizierten Paket) ---
     if (!istIndiziert) {
         // Ausnahme-Gruppe: 0x0210 (Spannung/Kapazität)
-        if (basisId == 0x0210) {
+        /*if (basisId == 0x0510) {
             if (letzteStelle > 1) {
                 istIndiziert = true;
-                aktiverIndex = letzteStelle - 1; // z.B. 0x0213 -> Index 2
+                aktiverIndex = letzteStelle - 1; // z.B. 0x0513 -> Index 2
             }
-        } 
-        // Standard-Gruppen: 0x0100 (Höhe), 0x0110 (Vario), 0x0200 (Strom), 0x0500 (RPM)
-        else if (basisId == 0x0100 || basisId == 0x0110 || basisId == 0x0200 || basisId == 0x0500) {
+        } */
+        // Standard-Gruppen: 0x0100 (Höhe), 0x0110 (Vario), 0x0200 (Strom), 0x0210 (MVOLT)
+        if (basisId == 0x0100 || basisId == 0x0110 || basisId == 0x0200 || basisId == 0x0210) {
             if (letzteStelle != 0) {
                 istIndiziert = true;
                 aktiverIndex = letzteStelle; // z.B. 0x0102 -> Index 2
@@ -537,7 +552,7 @@ uint16_t filterFrSkyId(uint16_t originaleId) {
         uint8_t testLetzteStelle = testId & 0x000F;
         
         // Gültig, wenn die bereinigte ID auf 0 endet ODER Kapazität (0x0211) ist
-        bool istGueltig = (testLetzteStelle == 0) || ((testId & 0xFFF0) == 0x0210 && testLetzteStelle == 1);
+        bool istGueltig = (testLetzteStelle == 0) ; //|| ((testId & 0xFFF0) == 0x0210 && testLetzteStelle == 1);
         
         if (!istGueltig) {
             return 0; // ⛔ Ungültig! Signalisiert der Hauptschleife: Paket verwerfen!
@@ -610,7 +625,7 @@ void decodeFrSkyCells(int32_t val) {
         // live_mvolt = total_mvolt;
         // has_mvolt = true;
        
-        setField(fields[MVOLT], total_mvolt);
+    if ( ! has_mvolt)  setField(fields[MVOLT], total_mvolt);
         //setField(fields[RESERVE1], total_mvolt);
     
     
@@ -625,6 +640,7 @@ static bool first_telemetry_received = false;
 static bool offset_captured = false;
 extern bool has_alt,has_alt_rel,has_alt_uni;
 
+/*
 if (has_alt_uni ) {  return; }// Wenn UNI-Höhe aktiv ist, IGNORIERE das FrSky Vario-Paket komplett!
 
 
@@ -663,10 +679,43 @@ else {
     setField(fields[RELATIVEALT], live_alt_rel); 
     setField(fields[ALTITUDE], live_alt_rel);  
 }
-
+*/
 has_alt_rel = true;
+    setField(fields[RELATIVEALT], val *100 ); // BARO
+   // setField(fields[ALTITUDE], val * 100);  
 
 }
+
+
+// Strom Kapazität
+void decode0x200(int32_t val) {
+    // 1. Zeitstempel über die in deinem Projekt genutzte Funktion holen
+    static uint32_t last_time_ms = 0;
+    uint32_t current_time_ms = millisRp(); 
+    
+    setField(fields[CURRENT], val);
+
+    // Statischer Float-Speicher für präzise mAh-Schritte
+    static float accumulated_mah = 0.0f;
+
+    // 2. Zeitdifferenz berechnen (nur wenn es nicht der erste Aufruf ist)
+    if (last_time_ms > 0 && current_time_ms > last_time_ms) {
+        uint32_t delta_t_ms = current_time_ms - last_time_ms;
+        
+        // Formel: (Strom in mA * Zeit in ms) / 3.600.000
+        accumulated_mah += ((float)val * (float)delta_t_ms) / 3600000.0f;
+    }
+    
+    // Zeitstempel für den nächsten Durchlauf merken
+    last_time_ms = current_time_ms;
+
+    // 3. Float in Ganzzahl konvertieren und an oXs übergeben
+    int32_t val2 = (int32_t)accumulated_mah;
+
+    // Übergabe an oXs (Index CAPACITY)
+    setField(fields[CAPACITY], val2);
+}
+
 
 // GPS KOORDINATES
 void decode0x800_o(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
@@ -980,12 +1029,12 @@ void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
             // 4. Werte skalieren und an die oXs-Felder übergeben
             
             // ECHTES HEADING: Wird mit Faktor 100 gespeichert (z. B. 185.50° wird zu 18550)
-            int32_t final_heading_value = (int32_t)roundf(current_track_deg * 100.0f);
+            int32_t final_heading_value = (int32_t)roundf(current_track_deg * 100.0f );
             if (final_heading_value >= 36000) final_heading_value = 0;
             setField(fields[RESERVE3], final_heading_value);
 
             // RELATIVER LENKWINKEL: Von -180 (links lenken) bis +180 (rechts lenken)
-            int32_t final_turn_value = (int32_t)roundf(turn_angle);
+            int32_t final_turn_value = (int32_t)roundf(turn_angle) + 18000; //************* */
             setField(fields[HEADING], final_turn_value);
             setField(fields[GPS_HOME_BEARING], final_turn_value);
             
@@ -1046,12 +1095,18 @@ void decode0x820(int32_t val) { // GPS Höhe
     // 🟢 Schritt 1: Wir warten, bis ÜBERHAUPT das erste Mal ein echter Wert reinkommt
     GpsAlt = true;
     has_alt = true;
-  
+
+    //setField(fields[GROUNDSPEED], val * 100);
+
+    setField(fields[ALTITUDE], val );  // GPS
+ 
+      
+
     if  ( has_alt_rel  || has_alt_uni ){  return; }
     
     //setField(fields[ALTITUDE], fields[RELATIVEALT].value); 
       
-
+    return;
    
 
     if (!first_telemetry_received) {
@@ -1089,7 +1144,7 @@ void decode0x820(int32_t val) { // GPS Höhe
             live_alt = val - alt_offset; 
         }
     }
-
+    
     setField(fields[ALTITUDE], live_alt);
     setField(fields[RELATIVEALT], live_alt); 
     //setField(fields[ALTITUDE], 2000); //live_alt);
@@ -1170,9 +1225,12 @@ void decode0x880(int32_t val) {// 🏔️ FrSky Vario: Absolute Höhe -> in rela
 
     extern bool has_alt,has_alt_rel,has_alt_uni;
 
+     uint32_t ALT = val;
+    
+
     //setField(fields[RELATIVEALT], 333); 
-     setField(fields[RELATIVEALT], val * 100); 
-     setField(fields[ALTITUDE], val * 100);  
+     setField(fields[RELATIVEALT], ALT );   // BARO
+     setField(fields[ALTITUDE], ALT );      // GPS
 
     has_alt_rel = true;
     has_alt_uni = true;
@@ -1248,9 +1306,10 @@ void handleMultiProtocol_N(uint8_t b) {
 
                             case 0x0100:              decode0x100(val)                                           ; break; // Höhe
                             case 0x0110:              setField(fields[VSPEED], val)                              ; break; // Vario
-                            case 0x0200:              setField(fields[CURRENT], val * 100); has_current = true   ; break; // FrSky 100mA -> HoTT 10mA
-                            case 0x0210:              setField(fields[MVOLT], val * 10)                          ; break; // FrSky 100mV -> HoTT 10mV
-                            case 0x0A12:              setField(fields[CAPACITY], val)                            ; break; // Kapazität
+                            case 0x0200:              decode0x200(val * 100)                                     ; break; // FrSky 100mA -> HoTT 10mA
+                           //case 0x0200:              setField(fields[CURRENT], val * 100); has_current = true  ; break; // FrSky 100mA -> HoTT 10mA
+                            case 0x0210:              setField(fields[MVOLT], val * 10);    has_mvolt = true     ; break; // FrSky 100mV -> HoTT 10mV
+                           // case 0x0600:              setField(fields[CAPACITY], val)                            ; break; // Kapazität
                             case 0x0300:              decodeFrSkyCells(val)                                      ; break; // Zellen
                             case 0x0500:              setField(fields[RPM], val);               has_rpm   = true ; break; // Drehzahl  
                             case 0x0511:              setField(fields[GROUNDSPEED], val * 100); has_speed = true ; break; // GPS Geschwindigkeit
@@ -1261,11 +1320,11 @@ void handleMultiProtocol_N(uint8_t b) {
                             case 0x0800:              decode0x800(val, buffer)                                   ; break; // GPS Koordinaten
 
                             case 0x0850:              decode0x850(val, buffer)                                   ; break; // GPS Zeit
-                            case 0x0880:              decode0x880(val)                                           ; break; // UNI Höhe
+                            //case 0x0880:              decode0x880(val)                                           ; break; // UNI Höhe
  
                          }
                          setField(fields[TEMP1], aktiverIndex );      // Unisens-E Index
-                         setField(fields[TEMP2], SW_Version );        // SW-Version
+                         setField(fields[TEMP2],  SW_Version  );        // SW-Version
                          fields[MVOLT].available = true;
 
 
@@ -1415,7 +1474,7 @@ void read_frsky_sensors_core1(void) {
                 last_packet_ms = now_ms;
                 setRgbColorOn(0, 1, 0); // 🟢 Helles Grün für das Paket!
 
-                if (debugTlm == 'Y') {
+                if (debugFrS == 'Y') {
                     // 🟢 NATIVE LITTLE-ENDIAN RECHNUNG:
                     // ID-High (Index 3) bildet die linken 8 Bit, ID-Low (Index 2) bildet die rechten 8 Bit.
                     uint16_t real_id = (uint16_t)((local_rx_buf[3] << 8) | local_rx_buf[2]);
@@ -1729,6 +1788,8 @@ void simulate_all_sensors_flexible() {
     // Satellitenanzahl
     uint8_t sim_sats = (cfg_alt.direction > 0) ? 12 : 8;
     setField(fields[NUMSAT], sim_sats);
+    //setField(fields[TEMP1], 2 );      // Unisens-E Index
+   // setField(fields[TEMP2],  SW_Version * 10 + 2 );        // SW-Version
 
     // --- 3. HARDWARE-BLINKTAKTSYNC ---
     if ((now / 1500) % 2 == 0) { setRgbColorOn(0, 1, 0); } else { setRgbColorOn(0, 0, 0); }

@@ -2,7 +2,7 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "FrSky_2_HoTT.elf"
+			"path" : "FrSky_2_CRSF.elf"
 		}
 	],
 	"backtrace" : 1,
@@ -63,7 +63,7 @@
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 70,
+				"line" : 58,
 				"parent" : 0
 			},
 			{
@@ -75,7 +75,7 @@
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 71,
+				"line" : 59,
 				"parent" : 0
 			},
 			{
@@ -87,7 +87,7 @@
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 72,
+				"line" : 60,
 				"parent" : 0
 			},
 			{
@@ -97,28 +97,10 @@
 				"parent" : 10
 			},
 			{
-				"command" : 4,
-				"file" : 0,
-				"line" : 64,
-				"parent" : 0
-			},
-			{
 				"command" : 3,
-				"file" : 2,
-				"line" : 45,
-				"parent" : 12
-			},
-			{
-				"command" : 4,
-				"file" : 0,
-				"line" : 65,
-				"parent" : 0
-			},
-			{
-				"command" : 3,
-				"file" : 2,
-				"line" : 45,
-				"parent" : 14
+				"file" : 1,
+				"line" : 75,
+				"parent" : 4
 			},
 			{
 				"command" : 4,
@@ -130,31 +112,19 @@
 				"command" : 3,
 				"file" : 2,
 				"line" : 45,
-				"parent" : 16
+				"parent" : 13
 			},
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 67,
+				"line" : 70,
 				"parent" : 0
 			},
 			{
 				"command" : 3,
 				"file" : 2,
 				"line" : 45,
-				"parent" : 18
-			},
-			{
-				"command" : 4,
-				"file" : 0,
-				"line" : 68,
-				"parent" : 0
-			},
-			{
-				"command" : 3,
-				"file" : 2,
-				"line" : 45,
-				"parent" : 20
+				"parent" : 15
 			},
 			{
 				"command" : 4,
@@ -166,67 +136,55 @@
 				"command" : 3,
 				"file" : 2,
 				"line" : 45,
-				"parent" : 22
+				"parent" : 17
 			},
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 62,
+				"line" : 67,
 				"parent" : 0
 			},
 			{
 				"command" : 3,
 				"file" : 2,
 				"line" : 45,
-				"parent" : 24
+				"parent" : 19
 			},
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 63,
+				"line" : 68,
 				"parent" : 0
 			},
 			{
 				"command" : 3,
 				"file" : 2,
 				"line" : 45,
-				"parent" : 26
+				"parent" : 21
 			},
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 58,
+				"line" : 71,
 				"parent" : 0
 			},
 			{
 				"command" : 3,
 				"file" : 2,
 				"line" : 45,
-				"parent" : 28
+				"parent" : 23
 			},
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 59,
+				"line" : 72,
 				"parent" : 0
 			},
 			{
 				"command" : 3,
 				"file" : 2,
 				"line" : 45,
-				"parent" : 30
-			},
-			{
-				"command" : 4,
-				"file" : 0,
-				"line" : 60,
-				"parent" : 0
-			},
-			{
-				"command" : 3,
-				"file" : 2,
-				"line" : 45,
-				"parent" : 32
+				"parent" : 25
 			},
 			{
 				"command" : 4,
@@ -238,13 +196,55 @@
 				"command" : 3,
 				"file" : 2,
 				"line" : 45,
-				"parent" : 34
+				"parent" : 27
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 62,
+				"parent" : 0
 			},
 			{
 				"command" : 3,
-				"file" : 1,
-				"line" : 75,
-				"parent" : 4
+				"file" : 2,
+				"line" : 45,
+				"parent" : 29
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 63,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 2,
+				"line" : 45,
+				"parent" : 31
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 64,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 2,
+				"line" : 45,
+				"parent" : 33
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 65,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 2,
+				"line" : 45,
+				"parent" : 35
 			},
 			{
 				"command" : 6,
@@ -268,7 +268,7 @@
 				"command" : 8,
 				"file" : 2,
 				"line" : 50,
-				"parent" : 28
+				"parent" : 6
 			},
 			{
 				"command" : 9,
@@ -1668,67 +1668,67 @@
 	[
 		{
 			"backtrace" : 7,
-			"id" : "oXs_uart_esc_rx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 9,
-			"id" : "oXs_uart_frsky_hub_tx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 11,
-			"id" : "oXs_uart_frsky_master_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 13,
-			"id" : "oXs_uart_mpx_tx_rx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 15,
-			"id" : "oXs_uart_sbus_tx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 17,
-			"id" : "oXs_uart_sport_tx_rx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 19,
-			"id" : "oXs_uart_srxl2_tx_rx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 21,
-			"id" : "oXs_uart_exbus_tx_rx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 23,
-			"id" : "oXs_uart_logger_tx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 25,
-			"id" : "oXs_uart_ibus_tx_rx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 27,
-			"id" : "oXs_uart_jeti_tx_pio_h::@6890427a1f51a3e7e1df"
-		},
-		{
-			"backtrace" : 29,
 			"id" : "oXs_uart_crsf_tx_pio_h::@6890427a1f51a3e7e1df"
 		},
 		{
-			"backtrace" : 31,
+			"backtrace" : 9,
 			"id" : "oXs_uart_gps_rx_pio_h::@6890427a1f51a3e7e1df"
 		},
 		{
-			"backtrace" : 33,
+			"backtrace" : 11,
 			"id" : "oXs_uart_gps_tx_pio_h::@6890427a1f51a3e7e1df"
 		},
 		{
-			"backtrace" : 35,
+			"backtrace" : 12,
+			"id" : "bs2_default_padded_checksummed_asm::@bc554eaed616d198a22d"
+		},
+		{
+			"backtrace" : 14,
+			"id" : "oXs_uart_sport_tx_rx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 16,
+			"id" : "oXs_uart_esc_rx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 18,
+			"id" : "oXs_uart_logger_tx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 20,
+			"id" : "oXs_uart_srxl2_tx_rx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 22,
+			"id" : "oXs_uart_exbus_tx_rx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 24,
+			"id" : "oXs_uart_frsky_hub_tx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 26,
+			"id" : "oXs_uart_frsky_master_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 28,
 			"id" : "oXs_uart_hott_tx_rx_pio_h::@6890427a1f51a3e7e1df"
 		},
 		{
+			"backtrace" : 30,
+			"id" : "oXs_uart_ibus_tx_rx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 32,
+			"id" : "oXs_uart_jeti_tx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 34,
+			"id" : "oXs_uart_mpx_tx_rx_pio_h::@6890427a1f51a3e7e1df"
+		},
+		{
 			"backtrace" : 36,
-			"id" : "bs2_default_padded_checksummed_asm::@bc554eaed616d198a22d"
+			"id" : "oXs_uart_sbus_tx_pio_h::@6890427a1f51a3e7e1df"
 		}
 	],
 	"id" : "oXs::@6890427a1f51a3e7e1df",
@@ -2516,7 +2516,7 @@
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "-Wl,-Map=FrSky_2_HoTT.elf.map",
+				"fragment" : "-Wl,-Map=FrSky_2_CRSF.elf.map",
 				"role" : "flags"
 			},
 			{
@@ -2568,7 +2568,7 @@
 		"language" : "CXX"
 	},
 	"name" : "oXs",
-	"nameOnDisk" : "FrSky_2_HoTT.elf",
+	"nameOnDisk" : "FrSky_2_CRSF.elf",
 	"paths" : 
 	{
 		"build" : ".",

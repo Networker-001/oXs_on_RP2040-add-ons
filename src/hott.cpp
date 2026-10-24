@@ -175,6 +175,9 @@ void hottPioRxHandlerIrq(){    // when a byte is received on the tlm pin, read t
 #ifdef DEBUG_HOTT_WITHOUT_RX
 uint32_t lastHottRequest = 0;
 #endif
+
+
+
 void handleHottRxTx(void){   // main loop : restore receiving mode , wait for tlm request, prepare frame, start pio and dma to transmit it
     static uint8_t previous = 0;
     static uint8_t data;
@@ -233,6 +236,8 @@ void handleHottRxTx(void){   // main loop : restore receiving mode , wait for tl
      
 }
 
+
+
 bool sendHottFrame(uint8_t data) { // return true when a frame is being sent
     bool sendingRequired = false;
     switch (data) {
@@ -256,7 +261,224 @@ bool sendHottFrame(uint8_t data) { // return true when a frame is being sent
     return sendingRequired;    
 }       
 
+
+bool fillHottGamFrame_test(){
+    // Wir nutzen das originale Puffer-Löschen
+    memset(&TxHottData.txBuffer[0], 0 , TXHOTTDATA_BUFFERSIZE) ;
+    
+    TxHottData.gamMsg.start_byte    = 0x7c ;
+    TxHottData.gamMsg.gam_sensor_id = 0x8d ; 
+    TxHottData.gamMsg.sensor_id     = 0xd0 ;
+    TxHottData.gamMsg.stop_byte     = 0x7D ;
+
+    // 🟢 SYNTHETISCHE RAMPE FÜR DEN TESTBETRIEB
+    // Generiert zyklisch Werte zwischen 0 und 1000
+    static int16_t test_counter = 0;
+    static bool direction_up = true;
+    
+    if (direction_up) {
+        test_counter += 5; // Schrittweite nach oben
+        if (test_counter >= 1000) direction_up = false;
+    } else {
+        test_counter -= 5; // Schrittweite nach unten
+        if (test_counter <= 0) direction_up = true;
+    }
+
+    // 1. ZELLEN SIMULIEREN (Pendeln zwischen 3.20V [160] und 4.20V)
+    uint8_t sim_cell = 160 + (test_counter * 50 / 1000); 
+    for(int i = 0; i < 4; i++) {
+        TxHottData.gamMsg.cell[i] = sim_cell; 
+    }
+    TxHottData.gamMsg.cell[4] = 0; // Zelle 5 & 6 starr auf 0
+    TxHottData.gamMsg.cell[5] = 0;
+
+    // 2. HAUPTAKKU SIMULIEREN (Pendeln zwischen 13.0V [130] und 16.8V)
+    TxHottData.gamMsg.Battery1 = 130 + (test_counter * 38 / 1000);
+    TxHottData.gamMsg.main_voltage = TxHottData.gamMsg.Battery1;
+    TxHottData.gamMsg.Battery2 = 0;
+
+    // 3. TEMPERATUREN SIMULIEREN (Pendeln zwischen 20°C [40] und 70°C)
+    TxHottData.gamMsg.temperature1 = 40 + (test_counter * 50 / 1000);
+    TxHottData.gamMsg.temperature2 = 45; // Starr
+
+    // 4. DREHZAHL SIMULIEREN (Pendeln zwischen 1000 RPM [100] und 6000 RPM)
+    TxHottData.gamMsg.rpm = 100 + (test_counter * 500 / 1000);
+
+    // 5. HÖHE SIMULIEREN (Pendeln zwischen 0m [500] und 250m)
+    TxHottData.gamMsg.altitude = 500 + (test_counter * 250 / 1000);
+
+    // 6. VARIO / STEIGRATE SIMULIEREN (Pendeln zwischen -5.0m/s [29500] und +5.0m/s)
+    TxHottData.gamMsg.climbrate_L = 29500 + test_counter;
+    TxHottData.gamMsg.climbrate3s = 120; // Mittig starr
+
+    // 7. STROM & KAPAZITÄT SIMULIEREN
+    TxHottData.gamMsg.current = 10 + (test_counter * 400 / 1000); // 1A bis 41A
+    TxHottData.gamMsg.batt_cap = (test_counter * 2000 / 1000) / 10; // 0 bis 2000mAh (in 10mAh Schritten)
+
+    // Originale Checksummen-Schleife (unverändert)
+    TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] = 0 ;
+    for(uint8_t i = 0; i < (TXHOTTDATA_BUFFERSIZE-1); i++){  
+        TxHottData.txBuffer[TXHOTTDATA_BUFFERSIZE-1] += TxHottData.txBuffer[i];
+    }  
+    return true;
+}
+
+
+
+
 bool fillHottGamFrame(){
+    memset(&TxHottData.txBuffer, 0 , TXHOTTDATA_BUFFERSIZE) ;
+    TxHottData.gamMsg.start_byte    = 0x7c ;
+    TxHottData.gamMsg.gam_sensor_id = 0x8d ; //GENRAL AIR MODULE = HOTT_TELEMETRY_GAM_SENSOR_ID
+    TxHottData.gamMsg.sensor_id     = 0xd0 ;
+    TxHottData.gamMsg.stop_byte     = 0x7D ;
+
+
+
+    // in general air module data to fill are:
+    
+    // 🟢 ABSOLUT VERLÄSSLICH: Da dein Parser rx_cells_mvolt[] füllt und has_rx_cells setzt,
+    // greift Mstrens' originaler Code deine LiPo-Zellen hier vollautomatisch ab!
+    if (has_rx_cells) {
+        /*for (int i = 0; i < 6; i++) {
+            if (rx_cells_mvolt[i] >= 5060) {
+                TxHottData.gamMsg.cell[i] = 253;
+            } else if (rx_cells_mvolt[i] >= 0) {
+                TxHottData.gamMsg.cell[i] = (uint8_t)(rx_cells_mvolt[i] / 20); // Wandlung in 2mV Schritte
+            }
+        }*/
+
+        for (int i = 0; i < 6; i++) {
+            int field_index = ADS_1_1 + i;
+            int32_t cell_mvolt = fields[field_index].value;
+
+            if (cell_mvolt >= 5060) {
+                TxHottData.gamMsg.cell[i] = 253; // HoTT-Maximalwertschutz
+            } else if (cell_mvolt > 0) { 
+                // 🟢 Umrechnung in HoTT-Format: Graupner erwartet den Wert in 20mV-Schritten!
+                // Hinweis: (Spannung in mV / 20) ergibt exakt die von HoTT geforderten 0.02V Schritte.
+                TxHottData.gamMsg.cell[i] = (uint8_t)(cell_mvolt / 20); 
+            } else {
+                TxHottData.gamMsg.cell[i] = 0; // Keine Zelle vorhanden
+            }
+        }
+
+
+
+    } else { // Originaler oXs ADS1115 / ADS1117 Zweig (unverändert)
+      if (adc1.adsInstalled ){
+        if (fields[ADS_1_1].available ) {
+            if ( fields[ADS_1_1].value >= 5060) { TxHottData.gamMsg.cell[0] = 253;}
+            else if ( fields[ADS_1_1].value >= 0) { TxHottData.gamMsg.cell[0] =  (uint8_t) (fields[ADS_1_1].value /20) ;} 
+        }
+        if (fields[ADS_1_2].available ) {
+            if ( fields[ADS_1_2].value >= 5060) { TxHottData.gamMsg.cell[1] = 253;}
+            else if ( fields[ADS_1_2].value >= 0) { TxHottData.gamMsg.cell[1] =  (uint8_t) (fields[ADS_1_2].value /20) ;} 
+        }
+        if (fields[ADS_1_3].available ) {
+            if ( fields[ADS_1_3].value >= 5060) { TxHottData.gamMsg.cell[2] = 253;}
+            else if ( fields[ADS_1_3].value >= 0) { TxHottData.gamMsg.cell[2] =  (uint8_t) (fields[ADS_1_3].value /20) ; }
+        }
+        if (fields[ADS_1_4].available ) {
+            if ( fields[ADS_1_4].value >= 5060) { TxHottData.gamMsg.cell[3] = 253;}
+            else if ( fields[ADS_1_4].value >= 0) { TxHottData.gamMsg.cell[3] =  (uint8_t) (fields[ADS_1_4].value /20) ; }
+        }
+      }
+      if (adc2.adsInstalled ){
+        if (fields[ADS_2_1].available ) {
+            if ( fields[ADS_2_1].value >= 5060) { TxHottData.gamMsg.cell[4] = 253;}
+            else if ( fields[ADS_2_1].value >= 0) { TxHottData.gamMsg.cell[4] =  (uint8_t) (fields[ADS_2_1].value /20) ;} 
+        }
+        if (fields[ADS_2_2].available ) {
+            if ( fields[ADS_2_2].value >= 5060) { TxHottData.gamMsg.cell[5] = 253;}
+            else if ( fields[ADS_2_2].value >= 0) { TxHottData.gamMsg.cell[5] =  (uint8_t) (fields[ADS_2_2].value) /20 ;} 
+        }
+      }  
+    } 
+
+    if( fields[MVOLT].available ) {
+              TxHottData.gamMsg.Battery1 = int_round(fields[MVOLT].value , 100);   //battery 1 voltage  0.1V steps. 55 = 5.5V only pos. voltages
+              #ifdef DEBUG_HOTT_WITHOUT_RX
+              if (TxHottData.gamMsg.Battery1 == 0) TxHottData.gamMsg.Battery1 = 0XFF;
+              #endif
+    }
+    if( fields[RESERVE1].available ) {  // = volt3
+              TxHottData.gamMsg.Battery2 = int_round( fields[RESERVE1].value ,  100) ; }    //battery 2 voltage  0.1V steps. 55 = 5.5V only pos. voltages
+    if ( ( fields[TEMP1].available) && (fields[TEMP1].value > -20) ) {
+        TxHottData.gamMsg.temperature1 = fields[TEMP1].value + 20 ; // Hott applies an offset of 20. A value of 20 = 0°C
+    } else {
+        TxHottData.gamMsg.temperature1 = 20 ; // Hott applies an offset of 20. A value of 20 = 0°C    
+    }
+    if ( ( fields[TEMP2].available) && (fields[TEMP2].value > -20) ) {
+        TxHottData.gamMsg.temperature2 = fields[TEMP2].value + 20 ; // Hott applies an offset of 20. A value of 20 = 0°C
+    } else {
+        TxHottData.gamMsg.temperature2 = 20 ; // Hott applies an offset of 20. A value of 20 = 0°C    
+    }
+    if( fields[RPM].available )
+        {TxHottData.gamMsg.rpm = int_round(fields[RPM].value , 10);}    //#22 RPM in 10 RPM steps. 300 = 3000rpm
+     if( fields[RELATIVEALT].available ) {
+        TxHottData.gamMsg.altitude = ( int_round(fields[RELATIVEALT].value , 100) ) +500 ;//altitude in meters. offset of 500, 500 = 0m
+    } else { TxHottData.gamMsg.altitude =  500 ; }                             //altitude in meters. offset of 500, 500 = 0m
+    if( fields[VSPEED].available ) {
+        TxHottData.gamMsg.climbrate_L = ( fields[VSPEED].value ) +30000 ;//climb rate in 0.01m/s. Value of 30000 = 0.00 m/s
+    } else { TxHottData.gamMsg.climbrate_L =  30000 ; }           //climb rate in 0.01m/s. Value of 30000 = 0.00 m/s
+    TxHottData.gamMsg.climbrate3s = 120 ;                     //#28 climb rate in m/3sec. Value of 120 = 0m/3sec
+   
+    if( fields[CURRENT].available) {
+        TxHottData.gamMsg.current =  int_round(fields[CURRENT].value , 100) ;}       //current in 0.1A steps 100 == 10,0A
+    
+    if( fields[RESERVE2].available ){ //Volt4
+        TxHottData.gamMsg.main_voltage = int_round(fields[RESERVE2].value , 100);          //Main power voltage using 0.1V steps 100 == 10,0V] / 100
+    }
+    if( fields[CAPACITY].available ){
+         TxHottData.gamMsg.batt_cap = int_round(fields[CAPACITY].value , 10) ;   // used battery capacity in 10mAh steps
+    }
+
+    // 🟢 GEÄNDERT: Wir ermitteln die schwächste Zelle direkt aus deinem echten rx_cells_mvolt[] Array
+     // 🟢 GEÄNDERT: Wir ermitteln die schwächste Zelle direkt aus deinem echten rx_cells_mvolt[] Array
+    if (has_rx_cells) {
+        uint16_t min_cell_mv = 9999;
+        uint8_t min_cell_idx = 0;
+        for (int i = 0; i < 6; i++) {
+            if (rx_cells_mvolt[i] > 2000 && rx_cells_mvolt[i] < min_cell_mv) { // Nur plausible Zellen (>2V)
+                min_cell_mv = rx_cells_mvolt[i];
+                min_cell_idx = i;
+            }
+        }
+        if (min_cell_mv != 9999) {
+            TxHottData.gamMsg.min_cell_volt = min_cell_mv / 20;            // In 2mV Schritten eintragen
+            TxHottData.gamMsg.min_cell_volt_num = min_cell_idx + 1;        // Zellennummer (1-6)
+        }
+    }
+
+    // 🟢 SICHRE ALARME: Nur aktivieren, wenn wirklich sauber definiert
+    #ifdef HOTT_MIN_VOLTAGE
+    if( fields[MVOLT].available ) {
+        uint8_t alarm = warning_beeps_Hott();
+        TxHottData.gamMsg.warning_beeps = (alarm <= 26) ? alarm : 0; // Schutz vor Geister-Werten
+    }
+    #else
+    TxHottData.gamMsg.warning_beeps = 0;
+    #endif
+
+    // 🟢 SICHRE CHECKSUMMEN-BERECHNUNG: Direkt über die GAM-Struktur (Verhindert GPS-Konflikte)
+    // Wir casten die Struktur temporär in ein Byte-Array, um exakt 44 Bytes zu summieren.
+    uint8_t *gam_bytes = (uint8_t *)&TxHottData.gamMsg;
+    uint32_t checksum_accumulator = 0;
+
+    for (uint8_t i = 0; i < 44; i++) { // Byte 0 bis 43 aufsummieren
+        checksum_accumulator += gam_bytes[i];
+    }
+
+    // Das 44. Byte (parity) erhält den Modulo-256-Wert
+    TxHottData.gamMsg.parity = (uint8_t)(checksum_accumulator & 0xFF);
+
+    return true;
+}
+
+
+
+bool fillHottGamFrame_old(){
     memset(&TxHottData.txBuffer, 0 , TXHOTTDATA_BUFFERSIZE) ;
     TxHottData.gamMsg.start_byte    = 0x7c ;
     TxHottData.gamMsg.gam_sensor_id = 0x8d ; //GENRAL AIR MODULE = HOTT_TELEMETRY_GAM_SENSOR_ID
@@ -391,7 +613,6 @@ bool fillHottGamFrame(){
 }
 
 
-
 bool fillHottGamFrame_o(){
     memset(&TxHottData.txBuffer[0], 0 , TXHOTTDATA_BUFFERSIZE) ;
     TxHottData.gamMsg.start_byte    = 0x7c ;
@@ -514,7 +735,195 @@ bool fillHottGamFrame_o(){
 
 static uint8_t convertGpsFix[5] = {0x2d , 0x2d , 0x32 , 0x33 , 0x44 } ; 
 
+
+bool fillHottGpsFrame_test(){ // Angepasst an Converter! Testversion!
+    extern bool GpsAlt;
+    
+    // 🟢 GEÄNDERT: Wir löschen NICHT den gemeinsamen Speicher per memset,
+    // da wir sonst die GAM-Daten mitten im Polling-Wechsel wegradieren würden!
+    // Stattdessen beschreiben wir die Felder einfach direkt.
+
+    TxHottData.gpsMsg.startByte        = 0x7c ;
+    TxHottData.gpsMsg.sensorID         = HOTT_TELEMETRY_GPS_SENSOR_ID ; // 0x8A
+    TxHottData.gpsMsg.sensorTextID     = HOTTV4_GPS_SENSOR_TEXT_ID ;    // 0xA0
+    TxHottData.gpsMsg.endByte          = 0x7D ;
+
+    // 🟢 SYNTHETISCHE RAMPE FÜR DEN GPS-TESTBETRIEB (Völlig unabhängig von fields)
+    static int16_t gps_test_counter = 0;
+    static bool gps_direction_up = true;
+    
+    if (gps_direction_up) {
+        gps_test_counter += 10; // Etwas schnellere Rampe für GPS
+        if (gps_test_counter >= 1000) gps_direction_up = false;
+    } else {
+        gps_test_counter -= 10;
+        if (gps_test_counter <= 0) gps_direction_up = true;
+    }
+
+    // 1. FLUG-RICHTUNG SIMULIEREN (0 bis 360 Grad)
+    TxHottData.gpsMsg.flightDirection = (gps_test_counter * 720 / 1000); // Entspricht 0-360° (Halbgrad-Schritte)
+
+    // 2. GESCHWINDIGKEIT SIMULIEREN (0 bis 150 km/h)
+    uint16_t speedHott = (gps_test_counter * 150 / 1000);
+    TxHottData.gpsMsg.GPSSpeedLow = speedHott ;                     
+    TxHottData.gpsMsg.GPSSpeedHigh = speedHott >> 8 ;               
+    
+    // 3. KOORDINATEN SIMULIEREN (Statische Werte ohne mathematische Divisionen)
+    TxHottData.gpsMsg.LatitudeNS = 0; // Nord                        
+    TxHottData.gpsMsg.LatitudeMinLow = 0x34;                           
+    TxHottData.gpsMsg.LatitudeMinHigh = 0x12;                     
+    TxHottData.gpsMsg.LatitudeSecLow = 0x78;                           
+    TxHottData.gpsMsg.LatitudeSecHigh = 0x56;                     
+    
+    TxHottData.gpsMsg.longitudeEW = 0; // Ost                        
+    TxHottData.gpsMsg.longitudeMinLow = 0x21;                           
+    TxHottData.gpsMsg.longitudeMinHigh = 0x43;                     
+    TxHottData.gpsMsg.longitudeSecLow = 0x65;                           
+    TxHottData.gpsMsg.longitudeSecHigh = 0x87;                     
+    
+    // 4. DISTANZ UND RICHTUNG NACH HAUSE
+    TxHottData.gpsMsg.distanceLow = gps_test_counter; // 0 bis 1000 Meter                             
+    TxHottData.gpsMsg.distanceHigh = gps_test_counter >> 8;                       
+    TxHottData.gpsMsg.HomeDirection = 90; // Starr Ost                       
+    
+    // 5. SAT-ANZAHL UND FIX (3D Fix mit 4 bis 14 Satelliten)
+    TxHottData.gpsMsg.GPSFixChar = '3'; // '3' = 3D Fix Symbol
+    TxHottData.gpsMsg.GPS_fix = TxHottData.gpsMsg.GPSFixChar;
+    TxHottData.gpsMsg.GPSNumSat = 4 + (gps_test_counter * 10 / 1000);               
+    
+    // 6. GPS-HÖHE SIMULIEREN (0m bis 500m)
+    /*uint16_t altitudeHott = 500 + (gps_test_counter * 500 / 1000);
+    TxHottData.gpsMsg.altitudeLow = altitudeHott ; 
+    TxHottData.gpsMsg.altitudeHigh = altitudeHott >> 8 ;
+    
+    // 7. VARIO-WERT IM GPS-DISPLAY SIMULIEREN
+    uint16_t varioHott = 30000 + (gps_test_counter - 500); // Pendelt um den Nullpunkt (30000)      
+    TxHottData.gpsMsg.resolutionLow = varioHott ;          
+    TxHottData.gpsMsg.resolutionHigh = varioHott >> 8;*/
+        // 🟢 TEST ZUR FOREN-THEORIE: Wir löschen Höhe und Vario aus dem GPS, 
+    // damit nur noch das GAM diese Werte an ExpressLRS liefert!
+    
+    // GPS-Höhe starr auf 0 Meter setzen (HoTT-Offset 500)
+    TxHottData.gpsMsg.altitudeLow = 500 & 0xFF; 
+    TxHottData.gpsMsg.altitudeHigh = 500 >> 8;
+    
+    // GPS-Vario starr auf 0 m/s setzen (HoTT-Nullpunkt 30000)      
+    TxHottData.gpsMsg.resolutionLow = 30000 & 0xFF;          
+    TxHottData.gpsMsg.resolutionHigh = 30000 >> 8;
+
+    TxHottData.gpsMsg.unknow1 = 120 ;                                       
+
+    // 🟢 DYNAMISCHE SICHRE CHECKSUMMEN-BERECHNUNG ÜBER BYTE-CASTING
+    uint8_t *gps_bytes = (uint8_t *)&TxHottData.gpsMsg;
+    uint32_t checksum_accumulator = 0;
+
+    for (uint8_t i = 0; i < 44; i++) {
+        checksum_accumulator += gps_bytes[i];
+    }
+
+    // Das 45. Byte (Index 44) bekommt die exakte Prüfsumme
+    gps_bytes[44] = (uint8_t)(checksum_accumulator & 0xFF);
+
+    return true;
+}
+
+
+
 bool fillHottGpsFrame(){ // Angepasst an Converter!
+    extern bool GpsAlt;
+    if ( ! gps.gpsInstalled &&  !(config.inav_ltm == 3 || config.inav_ltm == 4 ) ) return false ;         
+
+
+    // 🟢 GEÄNDERT: Wir löschen NUR das lokale GPS-Struct im Speicher, NIEMALS den txBuffer!
+    memset(&TxHottData.gpsMsg, 0, sizeof(TxHottData.gpsMsg));
+
+    TxHottData.gpsMsg.startByte    = 0x7c ;
+    TxHottData.gpsMsg.sensorID     = HOTT_TELEMETRY_GPS_SENSOR_ID ; //0x8A
+    TxHottData.gpsMsg.sensorTextID     = HOTTV4_GPS_SENSOR_TEXT_ID ; // 0xA0
+    TxHottData.gpsMsg.endByte     = 0x7D ;
+    uint16_t altitudeHott = 500 ;                   // Hott uses an offset of 500 (m)
+
+    // 🟢 DEIN ORIGINALER MITTELTEIL (UNVERÄNDERT BEIBEHALTEN):
+    if ( (config.inav_ltm == 3 || config.inav_ltm == 4) || (gps.GPS_fix_type == 3) || (gps.GPS_fix_type == 4) ) {
+        if (config.inav_ltm ==  config.inav_ltm){
+            TxHottData.gpsMsg.flightDirection = fields[HEADING].value / 200 ; // convert from degre * 100 to 1/2 degree
+            uint16_t speedHott ;
+            speedHott = ((uint32_t) fields[GROUNDSPEED].value) * 36 /1000 ;       // convert from cm/sec to km/h
+            TxHottData.gpsMsg.GPSSpeedLow = speedHott ;                     
+            TxHottData.gpsMsg.GPSSpeedHigh = speedHott >> 8 ;               
+            
+            uint16_t degMin ;
+            uint16_t decimalMin ;
+            TxHottData.gpsMsg.LatitudeNS = (fields[LATITUDE].value < 0) ;                        
+            convertLonLat_Hott(fields[LATITUDE].value, & degMin , & decimalMin ) ;              
+            TxHottData.gpsMsg.LatitudeMinLow = degMin ;                           
+            TxHottData.gpsMsg.LatitudeMinHigh = degMin >> 8 ;                     
+            TxHottData.gpsMsg.LatitudeSecLow = decimalMin ;                           
+            TxHottData.gpsMsg.LatitudeSecHigh = decimalMin >> 8 ;                     
+            
+            TxHottData.gpsMsg.longitudeEW = (fields[LONGITUDE].value < 0) ;                        
+            convertLonLat_Hott(fields[LONGITUDE].value, &degMin , &decimalMin ) ;              
+            TxHottData.gpsMsg.longitudeMinLow = degMin ;                           
+            TxHottData.gpsMsg.longitudeMinHigh = degMin >> 8 ;                     
+            TxHottData.gpsMsg.longitudeSecLow = decimalMin ;                           
+            TxHottData.gpsMsg.longitudeSecHigh = decimalMin >> 8 ;                     
+            
+            TxHottData.gpsMsg.distanceLow = gps.GPS_distance ;                             
+            TxHottData.gpsMsg.distanceHigh = gps.GPS_distance >> 8 ;                       
+            TxHottData.gpsMsg.HomeDirection = gps.GPS_bearing / 2 ;                        
+            
+            if ((config.inav_ltm == 3 || config.inav_ltm == 4) && fields[ALTITUDE].available) {
+                altitudeHott += (fields[ALTITUDE].value / 100) ;                      
+            } else {
+                altitudeHott += (fields[ALTITUDE].value / 100)  ;                         
+            }
+        } 
+    }
+                  
+    if ( fields[NUMSAT].value >= 4 ) {
+        TxHottData.gpsMsg.GPSFixChar = '3' ;
+    } else if (gps.GPS_fix_type > 4 ) { 
+        TxHottData.gpsMsg.GPSFixChar =  convertGpsFix[0] ;
+    } else {
+        TxHottData.gpsMsg.GPSFixChar =  convertGpsFix[gps.GPS_fix_type] ;
+    }    
+    TxHottData.gpsMsg.GPS_fix = TxHottData.gpsMsg.GPSFixChar ;
+    
+    TxHottData.gpsMsg.GPSNumSat = fields[NUMSAT].value;               
+    
+    TxHottData.gpsMsg.altitudeLow = altitudeHott ; 
+    TxHottData.gpsMsg.altitudeHigh = altitudeHott >> 8 ;
+    
+    uint16_t varioHott = 30000 ;
+    if ((config.inav_ltm == 3 || config.inav_ltm == 4) && fields[VSPEED].available) {
+        varioHott += fields[VSPEED].value;                                                
+    }               
+    TxHottData.gpsMsg.resolutionLow = varioHott ;          
+    TxHottData.gpsMsg.resolutionHigh = varioHott >> 8;
+    TxHottData.gpsMsg.unknow1 = 120 ;                                       
+
+    // 🟢 SICHRE CHECKSUMMEN-BERECHNUNG ÜBER BYTE-CASTING (Löst den Compiler-Fehler)
+    // Ein HoTT-GPS-Frame hat eine feste Länge von 45 Bytes (Index 0 bis 44).
+    uint8_t *gps_bytes = (uint8_t *)&TxHottData.gpsMsg;
+    uint32_t checksum_accumulator = 0;
+
+    // Aufsummieren der ersten 44 Bytes (Byte 0 bis Byte 43)
+    for (uint8_t i = 0; i < 44; i++) {
+        checksum_accumulator += gps_bytes[i];
+    }
+
+    // Das allerletzte Byte im Speicher des Structs (Index 44) erhält die Checksumme,
+    // ohne dass wir den exakten Variablennamen im Struct kennen müssen.
+    gps_bytes[44] = (uint8_t)(checksum_accumulator & 0xFF);
+
+    return true;
+}
+
+
+
+
+
+bool fillHottGpsFrame_old(){ // Angepasst an Converter!
     // 🟢 GEÄNDERT: Einstiegssperre erweitert um die Protokoll-Bedingung für den Wandler-Betrieb
     extern bool GpsAlt;
      if ( ! gps.gpsInstalled &&  !(config.inav_ltm == 3 || config.inav_ltm == 4 ) ) return false ;         //&& !(config.inav_ltm == 3 || config.inav_ltm == 4 ) &&  ! has_alt       

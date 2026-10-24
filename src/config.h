@@ -367,7 +367,7 @@
 // =================================================================
 
 
-#define PROTO_SELECT  4
+#define PROTO_SELECT  5
 
 
 // 1 = ltm to Jeti EX Protocoll

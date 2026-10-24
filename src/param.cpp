@@ -70,6 +70,7 @@ extern uint32_t lastRcChannels;
 
 
 CONFIG config;
+uint8_t debugFrS = 'N';
 uint8_t debugTlm = 'N';
 uint8_t debugVal = 'N';
 uint8_t debugAll = 'N';
@@ -278,9 +279,10 @@ void printHelp(){
 
     printf("  6. Debugging:\n")  ;
     printf("     FV                 : Show telemetrie values once \n")  ;
-    printf("     DT = Y             : Show incomming FRSKY pakets \n")  ;
-    printf("     DV = Y             : Show incomming FRSKY values \n")  ;
-    printf("     DA = Y             : Show incomming FRSKY values \n")  ;
+    printf("     DT = Y             : Show telemetrie packets continuously \n")  ;
+    printf("     DV = Y             : Show telemetrie values continuously \n")  ;
+    printf("     DA = Y             : Show telemetrie table continuously \n")  ;
+    printf("     DF = Y             : Show FRSKY packets continuously \n")  ;
 
     printf("------------------------------------------\n\n")  ;
 
@@ -699,6 +701,19 @@ int8_t handleOneCmd( char * bufferPos){ // handle one command with buffer starti
             printf("Error : DEBUGALL must be Y or N\n");
         }
     }   
+
+    // change debugTlm
+    if (( strcmp("DEBUGFRS", pkey) == 0 ) || ( strcmp("DF", pkey) == 0 ) ){ // if the key is DEBUGTLM
+        if (strcmp("Y", pvalue) == 0) {
+            debugFrS  = 'Y';
+            return 0;
+        } else if (strcmp("N", pvalue) == 0) {
+            debugFrS  = 'N';
+            return 0; 
+        } else  {
+            printf("Error : DEBUGFRS must be Y or N\n");
+        }
+    }
 
     // change debugSbusOut
     if ( strcmp("DEBUGSBUSOUT", pkey) == 0 ) { // if the key is DEBUGSBUSOUT

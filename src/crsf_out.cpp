@@ -18,6 +18,11 @@
 #include <inttypes.h>
 #include "mpu.h"
 
+
+
+
+
+
 #define FRAME_TYPES_MAX 7
 uint32_t crsfFrameNextMillis[FRAME_TYPES_MAX] = {0} ; 
 uint8_t crsf_last_frame_idx = 0 ;  
@@ -110,6 +115,8 @@ bool dataAvailable(uint8_t idx) {
                 return true; 
             }
             return has_rx_cells;
+
+            
     }
     return false;
     // to be continue with other frames/data if ELRS support them.
@@ -171,7 +178,7 @@ void fillFrameBattery(uint8_t idx){
     //voltageFrame.crc = crsf_crc.calc( ((uint8_t *) &voltageFrame) + 2 , CRSF_FRAME_BATTERY_SENSOR_PAYLOAD_SIZE + 1)  ; // CRC skip 2 bytes( addr of message and frame size); length include type + 6 for payload  
     fillBufferU8(crsf_crc_out.calc( &CRSFBuffer[2] , CRSF_FRAME_BATTERY_SENSOR_PAYLOAD_SIZE + 1) ) ; // CRC skip 2 bytes( addr of message and frame size); length include type + 6 for payload  
     
-    fields[MVOLT].available = false ;
+    //fields[MVOLT].available = false ;
     crsfFrameNextMillis[idx] = millisRp() + VOLTAGE_FRAME_INTERVAL;
     if ( debugTlm == 'Y' ){
         printf("Bat: ");
@@ -191,7 +198,7 @@ void fillFrameVario(uint8_t idx){
     fillBufferI16( (int16_t) fields[VSPEED].value ) ;  // cm/sec
     //printf("vspeed=%d\n", ((int16_t) fields[VSPEED].value) );
     fillBufferU8( crsf_crc_out.calc( &CRSFBuffer[2] , CRSF_FRAME_VARIO_PAYLOAD_SIZE + 1) ) ; // CRC skip 2 bytes( addr of message and frame size); length include type + 6 for payload  
-    fields[VSPEED].available = false ;
+    //fields[VSPEED].available = false ;
     crsfFrameNextMillis[idx] = millisRp() + VARIO_FRAME_INTERVAL;
     if ( debugTlm == 'Y' ){
         printf("Vario: ");
@@ -208,12 +215,23 @@ void fillFrameBaroAltitude(uint8_t idx){
     fillBufferU8( CRSF_ADDRESS_CRSF_RECEIVER );
     fillBufferU8( CRSF_FRAME_BARO_ALTITUDE_PAYLOAD_SIZE + 2 ); // + 2 because we add type and crc byte 
     fillBufferU8( CRSF_FRAMETYPE_BARO_ALTITUDE ) ;
-    fillBufferI16( (int16_t) ( (fields[RELATIVEALT].value / 10 ) + 10000) ) ;  // from cm to dm and a 10000 dm offset
+
+        // 🟢 FIX: Sichere Berechnung vor dem int16_t Cast, um den Unterlauf auf -333 zu verhindern
+    int32_t calculated_alt_dm = (fields[RELATIVEALT].value / 10) + 10000;
+    
+    // Begrenzungsschutz, damit der Wert niemals das int16_t Limit sprengt
+    if (calculated_alt_dm > 32767) calculated_alt_dm = 32767;
+    if (calculated_alt_dm < -32768) calculated_alt_dm = -32768;
+
+    fillBufferI16( (int16_t)calculated_alt_dm );
+
+    //fillBufferI16( (int16_t) ( (fields[RELATIVEALT].value / 10 ) + 10000) ) ;  // from cm to dm and a 10000 dm offset
+    
     //printf("alt=%f\n", (float) ( (int16_t) ( (fields[RELATIVEALT].value / 10 ) + 10000) )  );
     // in theory, when Alt in dm should be more than about 32000-10000, then value should be negative and in m instead of in dm (and no offset)
     // So when alt is more than 2000m; we can discard this situation
     fillBufferU8( crsf_crc_out.calc( &CRSFBuffer[2] , CRSF_FRAME_BARO_ALTITUDE_PAYLOAD_SIZE + 1) ) ; // CRC skip 2 bytes( addr of message and frame size); length include type + 6 for payload  
-    fields[RELATIVEALT].available = false ;
+    //fields[RELATIVEALT].available = false ;
     crsfFrameNextMillis[idx] = millisRp() + BARO_ALTITUDE_FRAME_INTERVAL;
     if ( debugTlm == 'Y' ){
         printf("Alt: ");
@@ -278,7 +296,19 @@ void fillFrameGps(uint8_t idx){
         //} else {
         //    fillBufferU16( (uint16_t) (1000 + fields[ALTITUDE].value / 100 )) ;     //( from mm to m and an offset of 1000 m )
         //}
-        fillBufferU16( (uint16_t) (1000 + fields[ALTITUDE].value / 100 )) ;     //( converted to cm in gps.cpp and here from cm to m and an offset of 1000 m )
+
+            // 🟢 FIX: Vorzeichenbehaftete Berechnung der GPS-Höhe mit Schutz vor Überlauf
+        int32_t gps_alt_m = fields[ALTITUDE].value / 100; // Umrechnung von cm in Meter
+        int32_t calculated_gps_alt = 1000 + gps_alt_m;    // 1000 Meter TBS-Offset addieren
+
+        // Grenzen absichern, damit der uint16_t Puffer niemals gesprengt wird
+        if (calculated_gps_alt > 65535) calculated_gps_alt = 65535;
+        if (calculated_gps_alt < 0)     calculated_gps_alt = 0;
+
+        // Jetzt absolut sicher in den Puffer schreiben
+        fillBufferU16( (uint16_t)calculated_gps_alt );
+
+        //fillBufferU16( (uint16_t) (1000 + fields[ALTITUDE].value / 100 )) ;     //( converted to cm in gps.cpp and here from cm to m and an offset of 1000 m )
         fillBufferU8( (uint8_t) fields[NUMSAT].value );       //( counter including +100 when 3D fix )
         //fields[NUMSAT].available = false;
 
@@ -445,7 +475,51 @@ void fillFrameVoltages(uint8_t idx) {
     dma_channel_set_trans_count (crsf_dma_chan, CRSFBufferLength, true) ;    
 }
 
+//#define TEMP_FRAME_INTERVAL 500
 
+/*void fillFrameTemperature(uint8_t idx) {
+
+    return; //fflush(stdout);
+
+    CRSFBufferLength = 0;
+    fillBufferU8(CRSF_ADDRESS_CRSF_RECEIVER);
+    
+    // Payload-Größe ist 2 Bytes. +2 für den Frame-Typ und das CRC-Byte
+    #define CRSF_FRAME_TEMP_SENSOR_PAYLOAD_SIZE 2
+    fillBufferU8(CRSF_FRAME_TEMP_SENSOR_PAYLOAD_SIZE + 2); 
+    
+    // CRSF Typ für Temperatur (0x0D)
+    fillBufferU8(CRSF_FRAMEIDX_TEMP);
+    
+    // Prüfen, ob der Temperaturwert verfügbar ist (z. B. TEMP1)
+    if (fields[TEMP1].available) {
+        // CRSF erwartet oft °C direkt als Ganzzahl oder mit Offset. 
+        // oXs speichert Temperaturen meistens direkt in °C.
+        int8_t tempValue = (int8_t)fields[TEMP1].value;
+        fillBufferU8((uint8_t)tempValue);
+    } else {
+        fillBufferU8(0); // Standardwert, falls kein Sensor Daten liefert
+    }
+    
+    fillBufferU8(0); // Zweites Byte der Payload ist ungenutzt/Reserve
+    
+    // CRC-Berechnung über den gesamten Frame (ab Byte index 2)
+    fillBufferU8(crsf_crc_out.calc(&CRSFBuffer[2], CRSF_FRAME_TEMP_SENSOR_PAYLOAD_SIZE + 1)); 
+    
+    // Intervall-Timer setzen (z. B. TEMP_FRAME_INTERVAL in deiner config.h definieren)
+    crsfFrameNextMillis[idx] = millisRp() + TEMP_FRAME_INTERVAL;
+    
+    // Serielles Debugging
+    if (debugTlm == 'Y') {
+        printf("Temp: ");
+        for (uint8_t i = 0; i < CRSFBufferLength; i++) printf(" %02X ", CRSFBuffer[i]);
+        printf("\n");
+    }
+    
+    // Übertragung per DMA anstoßen
+    dma_channel_set_read_addr(crsf_dma_chan, &CRSFBuffer[0], false);
+    dma_channel_set_trans_count(crsf_dma_chan, CRSFBufferLength, true);    
+}*/
 
 
 
@@ -474,7 +548,8 @@ void fillOneFrame(uint8_t idx){
             break ;
         case CRSF_FRAMEIDX_VOLTAGES :
             fillFrameVoltages(idx);
-            break ;                   
+            break ;   
+             
     } // end switch
 }
 

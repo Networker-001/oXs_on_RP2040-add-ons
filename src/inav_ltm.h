@@ -11,6 +11,7 @@
 
 void init_inav_ltm();
 void parse_inav_ltm();
+void simulate_all_sensors_ltm();
 //void getSensors_ltm(void) ;
 
 // =================================================================
