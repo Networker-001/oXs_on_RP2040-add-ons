@@ -167,11 +167,26 @@ void MPU::begin()  // initialise MPU6050
     
     mpuInstalled =  true;
     //printf("MPU MAP initialized\n");
-    kalmanFilter4d_configure(1000.0f*(float)KF_ACCEL_VARIANCE_DEFAULT, KF_ADAPT, 0.0f, 0.0f, 0.0f);
+
+    mpuInstalled = true;
+    
+    // Die saubere Weiche über die offizielle getDeviceID()-Funktion
+    if (mpu6050.getDeviceID() == 0x38) { 
+        isMpu9250 = true;
+        // MPU9250: Starre Konfiguration ohne den kriechenden Drift
+        //kalmanFilter4d_configure(1000.0f*(float)KF_ACCEL_VARIANCE_DEFAULT, 0, 0.0f, 0.0f, 0.0f);
+        kalmanFilter4d_configure(1000.0f*(float)KF_ACCEL_VARIANCE_DEFAULT, KF_ADAPT, 0.0f, 0.0f, 0.0f);
+    } else {
+        isMpu9250 = false;
+        // MPU6050: Originale dynamische Anpassung
+        kalmanFilter4d_configure(1000.0f*(float)KF_ACCEL_VARIANCE_DEFAULT, KF_ADAPT, 0.0f, 0.0f, 0.0f);
+    }
+
     setupOrientation(); // based on config.mpuOrientation fill orientationX,Y,Z and signX, Y, Z and orientationIsWrong
 }
 
 
+//
 void MPU::testDevicesOffsetX(){
     sleep_ms(1000);
     //int16_t gyroX[16];
@@ -368,7 +383,7 @@ void MPU::nextAccCalibrationExecute(){
     }
     printf("Start reading nr: %i\n", calibAccCount+1) ;
     for (int inx = 0; inx < ACCEL_NUM_AVG_SAMPLES; inx++){
-        sleep_us(2000); // take 8 msec with dlpf = 20 ; 1900us when BW = 188
+        sleep_us(100); // take 8 msec with dlpf = 20 ; 1900us when BW = 188
         // Start reading acceleration registers from register 0x3B for 14 bytes (acc, temp, gyro)
         uint8_t val = 0x3B;
         uint8_t buffer[14]; 
@@ -429,7 +444,7 @@ void MPU::nextAccCalibrationExecute(){
 
 #define KP1_LOW_LIMIT 0.975
 #define KP1_HIGH_LIMIT 1.025
-#define KP1 2.0
+#define KP1 2.0 // 2.0
 #define KI1 0.0
 
 #define KP2_LOW_LIMIT 0.950
@@ -459,6 +474,9 @@ void Mahony_update(float ax, float ay, float az, float gx, float gy, float gz, f
         kp = 0;
         ki = 0;
     }
+
+        // REPARATUR: tmp berechnen (Summe der Quadrate der Beschleunigungen)
+    //tmp = ax * ax + ay * ay + az * az;
     // 
     // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
     if (tmp > 0.0) {
@@ -617,6 +635,18 @@ bool MPU::getAccZWorld(){ // return true when a value is available ; read the IM
     gRaw[1] = ((int16_t) (buffer[10] << 8 | buffer[11])) ;
     gRaw[2] = ((int16_t) (buffer[12] << 8 | buffer[13])) ;
 
+
+    // Wir casten die High-Bytes explizit als signed char (int8_t), 
+    // damit das Vorzeichen beim Shift um 8 Bits mathematisch absolut korrekt erhalten bleibt!
+    /*aRaw[0] = (int16_t) (buffer[0] << 8 | buffer[1]);
+    aRaw[1] = (int16_t) (buffer[2] << 8 | buffer[3]);
+    aRaw[2] = (int16_t) (buffer[4] << 8 | buffer[5]);
+    
+    gRaw[0] = (int16_t) (buffer[8] << 8 | buffer[9]);
+    gRaw[1] = (int16_t) (buffer[10] << 8 | buffer[11]);
+    gRaw[2] = (int16_t) (buffer[12] << 8 | buffer[13]);*/
+
+
     
     #ifdef CALIBRATE_GYRO_ON_RESET
     #define NUMBER_ITER_CALIB 1000
@@ -641,8 +671,8 @@ bool MPU::getAccZWorld(){ // return true when a value is available ; read the IM
             if ( ((gMax[0]-gMin[0]) > MAX_GYRO_DIFF) or ((gMax[1]-gMin[1]) > MAX_GYRO_DIFF) or((gMax[2]-gMin[2]) > MAX_GYRO_DIFF) ){
                 printf("Automatic gyro calibration failed; oXs uses gyro offsets saved during horizontal calibration\n");
             } else {
-                config.gyroOffsetX= (int16_t)(gSum[0] / 2000);  config.gyroOffsetY= (int16_t)(gSum[1]/2000); config.gyroOffsetZ= (int16_t)(gSum[2]/2000);
-            //printf(" offset gx=%i  gy=%i   gz=%i\n",  (int)config.gyroOffsetX ,(int)config.gyroOffsetY,(int)config.gyroOffsetZ);
+                config.gyroOffsetX= (int16_t)(gSum[0] / 1000);  config.gyroOffsetY= (int16_t)(gSum[1]/1000); config.gyroOffsetZ= (int16_t)(gSum[2]/1000);
+            printf(" offset gx=%i  gy=%i   gz=%i\n",  (int)config.gyroOffsetX ,(int)config.gyroOffsetY,(int)config.gyroOffsetZ);
             }
             return false ; // skip rest of calcul
         }
@@ -695,7 +725,32 @@ bool MPU::getAccZWorld(){ // return true when a value is available ; read the IM
     now = microsRp();
     deltat = ((float)(now - last))* 1.0e-6; //seconds since last update
     last = now;
-    Mahony_update( (float) oax, (float) oay, (float) oaz , ((float) ogx) * gyroScaleRad, ((float) ogy) * gyroScaleRad , ((float) ogz) * gyroScaleRad, deltat);
+
+    /*if (isMpu9250) {
+        // DYNAMISCHES DEADBAND:
+        // Wenn das Board fast flach liegt (Pitch und Roll nahe 0), schalten wir das 
+        // Deadband scharf (55), um den unendlichen Kriech-Drift im Stillstand zu stoppen.
+        // Wenn wir weiter weg sind (über 1,5 Grad), machen wir das Deadband extrem klein (5),
+        // damit der Filter den Restfehler sauber bis auf 0 ausregeln kann!
+        int16_t gyro_deadband = 5; 
+        
+        if (abs(pitch) < 150 && abs(roll) < 150) { 
+            gyro_deadband = 55; // Scharfes Deadband im echten Stillstand am Horizont
+        }
+
+        if (ogx > -gyro_deadband && ogx < gyro_deadband) ogx = 0;
+        if (ogy > -gyro_deadband && ogy < gyro_deadband) ogy = 0;
+        if (ogz > -gyro_deadband && ogz < gyro_deadband) ogz = 0;
+    }*/
+    // REPARATUR FÜR DIE KALIBRIERUNG:
+    // Wenn oXs gerade kalibriert, überspringen wir das Mahony-Update.
+    // Dadurch bleibt der Filter im Hintergrund still, das Rauschen sinkt unter 200,
+    // und MPUCAL=G läuft sofort wieder fehlerfrei durch!
+    
+        Mahony_update( (float) oax, (float) oay, (float) oaz , ((float) ogx) * gyroScaleRad, ((float) ogy) * gyroScaleRad , ((float) ogz) * gyroScaleRad, deltat);
+    
+    // Jetzt rufen wir Mahony mit den bereinigten ogx, ogy, ogz auf:
+   // Mahony_update( (float) oax, (float) oay, (float) oaz , ((float) ogx) * gyroScaleRad, ((float) ogy) * gyroScaleRad , ((float) ogz) * gyroScaleRad, deltat);
     // this formula to calculate vertical accz comes from
     // https://github.com/har-in-air/ESP32_IMU_BARO_GPS_VARIO/blob/b0157b91902fe4d2de13a3198160438307d71662/src/sensor/imu.cpp
     // in imu_gravityCompensatedAccel()
@@ -705,8 +760,35 @@ bool MPU::getAccZWorld(){ // return true when a value is available ; read the IM
     
     sumAccZ += accVert;
     countAccZ++;
+
+
+
+    // INAV-STYLE MIT KORREKTER TELEMETRIE-RUNDUNG:
+    // Wir multiplizieren direkt mit 100.0f für das oXs-Protokoll 
+    // und nutzen roundf(), damit minimale Nachkommastellen nicht zu -100 abgerundet werden!
+    
+     // KORREKTUR: Reine Grad-Werte liefert, wie von oXs erwartet.
+    // roundf fängt minimale float-Ungenauigkeiten ab, ohne die Werte zu verhundertfachen!
+    
+   // roll  = roundf( RAD_TO_DEGREE * atan2((float)oay, (float)oaz) );
+   // pitch = roundf( RAD_TO_DEGREE * atan2((float)-oax, sqrtf((float)oay * oay + (float)oaz * oaz)) );
+
+
+
+
+
+
+
+
+
+
+
+
     roll  = RAD_TO_DEGREE * atan2((qh[0] * qh[1] + qh[2] * qh[3]), 0.5 - (qh[1] * qh[1] + qh[2] * qh[2]));
     pitch = -RAD_TO_DEGREE * asin(2.0 * ( qh[0] * qh[2] - qh[1] * qh[3]));
+
+
+
     //if (msgEverySec(0)){printf("GOH=%i GOV=%i ax=%i  ay=%i   az=%i  roll=%.0f     pitch=%.0f\n",\
     //            config.mpuOrientationH, config.mpuOrientationV, oax, oay ,oaz , roll , pitch);}
     

@@ -23,7 +23,7 @@
 
 
 
-#define FRAME_TYPES_MAX 7
+#define FRAME_TYPES_MAX 8
 uint32_t crsfFrameNextMillis[FRAME_TYPES_MAX] = {0} ; 
 uint8_t crsf_last_frame_idx = 0 ;  
 
@@ -115,7 +115,8 @@ bool dataAvailable(uint8_t idx) {
                 return true; 
             }
             return has_rx_cells;
-
+        case CRSF_FRAMEIDX_TEMP:
+            return true;
             
     }
     return false;
@@ -477,53 +478,44 @@ void fillFrameVoltages(uint8_t idx) {
 
 //#define TEMP_FRAME_INTERVAL 500
 
-/*void fillFrameTemperature(uint8_t idx) {
-
-    return; //fflush(stdout);
-
+void fillFrameTemperature(uint8_t idx) {
     CRSFBufferLength = 0;
     fillBufferU8(CRSF_ADDRESS_CRSF_RECEIVER);
     
-    // Payload-Größe ist 2 Bytes. +2 für den Frame-Typ und das CRC-Byte
-    #define CRSF_FRAME_TEMP_SENSOR_PAYLOAD_SIZE 2
-    fillBufferU8(CRSF_FRAME_TEMP_SENSOR_PAYLOAD_SIZE + 2); 
+    // Payload-Größe: 1 Byte Source ID + 2 Bytes Temp1 + 2 Bytes Temp2 = 5 Bytes
+    #define CRSF_FRAME_TEMP_SENSOR_PAYLOAD_SIZE 5
+    fillBufferU8(CRSF_FRAME_TEMP_SENSOR_PAYLOAD_SIZE + 2); // Schreibt 7 in das Längen-Byte!
     
-    // CRSF Typ für Temperatur (0x0D)
-    fillBufferU8(CRSF_FRAMEIDX_TEMP);
+    fillBufferU8(0x0D); // CRSF_FRAMETYPE_TEMP
     
-    // Prüfen, ob der Temperaturwert verfügbar ist (z. B. TEMP1)
+    // 1. Byte der Payload: Source ID (0x00 = Standard/FC)
+    fillBufferU8(0x00); 
+    
+    // --- TEMPERATUR 1 (int16_t in 0.1°C -> 200 entspricht 20.0°C) ---
     if (fields[TEMP1].available) {
-        // CRSF erwartet oft °C direkt als Ganzzahl oder mit Offset. 
-        // oXs speichert Temperaturen meistens direkt in °C.
-        int8_t tempValue = (int8_t)fields[TEMP1].value;
-        fillBufferU8((uint8_t)tempValue);
+        int16_t temp1_deci = (int16_t)(fields[TEMP1].value * 10);
+        fillBufferI16(temp1_deci);
     } else {
-        fillBufferU8(0); // Standardwert, falls kein Sensor Daten liefert
+        fillBufferI16((int16_t)200); 
     }
     
-    fillBufferU8(0); // Zweites Byte der Payload ist ungenutzt/Reserve
-    
-    // CRC-Berechnung über den gesamten Frame (ab Byte index 2)
+    // --- TEMPERATUR 2 (int16_t in 0.1°C -> 200 entspricht 20.0°C) ---
+    if (fields[TEMP2].available) {
+        int16_t temp2_deci = (int16_t)(fields[TEMP2].value * 10);
+        fillBufferI16(temp2_deci);
+    } else {
+        fillBufferI16((int16_t)200); 
+    }
+
+    // CRC berechnen (Umfasst jetzt Typ + 5 Bytes Payload = 6 Bytes ab Index 2)
     fillBufferU8(crsf_crc_out.calc(&CRSFBuffer[2], CRSF_FRAME_TEMP_SENSOR_PAYLOAD_SIZE + 1)); 
-    
-    // Intervall-Timer setzen (z. B. TEMP_FRAME_INTERVAL in deiner config.h definieren)
+   
     crsfFrameNextMillis[idx] = millisRp() + TEMP_FRAME_INTERVAL;
     
-    // Serielles Debugging
-    if (debugTlm == 'Y') {
-        printf("Temp: ");
-        for (uint8_t i = 0; i < CRSFBufferLength; i++) printf(" %02X ", CRSFBuffer[i]);
-        printf("\n");
-    }
-    
-    // Übertragung per DMA anstoßen
+    // DMA übertragen
     dma_channel_set_read_addr(crsf_dma_chan, &CRSFBuffer[0], false);
     dma_channel_set_trans_count(crsf_dma_chan, CRSFBufferLength, true);    
-}*/
-
-
-
-
+}
 
 
 
@@ -548,8 +540,10 @@ void fillOneFrame(uint8_t idx){
             break ;
         case CRSF_FRAMEIDX_VOLTAGES :
             fillFrameVoltages(idx);
-            break ;   
-             
+            break ;
+        case  CRSF_FRAMEIDX_TEMP:
+            fillFrameTemperature(idx);
+            break ;               
     } // end switch
 }
 

@@ -36,6 +36,8 @@
 //#include "param.h"
 
 #include "ws2812.h"
+#include "lps22hb.h"
+
 #include "rpm.h"
 #include "EMFButton.h"
 #include "ads1115.h"
@@ -196,6 +198,7 @@ int32_t i2cError = 0;
 MS5611 baro1;    // class to handle MS5611; adress = 0x77 or 0x76
 SPL06 baro2;    // class to handle SPL06; adress = 0x77 or 0x76
 BMP280 baro3 ;    // class to handle BMP280; adress = 0x77 or 0x76
+LPS22HB baro4;    // class to handle LPS22HB; adress = 0x5C (Unser neues Baro!)
 
 ADS1115 adc1( I2C_ADS_Add1 , 0) ;     // class to handle first ads1115 (adr pin connected to grnd)
 ADS1115 adc2( I2C_ADS_Add2 , 1) ;     // class to handle second ads1115 (adr pin connected to vdd)
@@ -363,6 +366,11 @@ void setupSensors(){     // this runs on core1!!!!!!!!
         baro3.begin(); // check BMP280;  when ok, baro3.baroInstalled  = true
         //printf("baro3 done\n");
       }
+      // Waveshare 1.0.2 board has a LPS22HB baro on it; we check it only if no other baro is installed:
+      if (! (baro1.baroInstalled or baro2.baroInstalled or baro3.baroInstalled)) {
+        baro4.begin(); 
+      }
+
       adc1.begin() ; 
       //printf("adc1 done\n");
       adc2.begin() ;
@@ -413,6 +421,10 @@ void getSensors(void){                                                          
 		} else if (baro3.baroInstalled) {                                        // check if baro 3 is present
 			if ( baro3.getAltitude() == 0) {                                      // calculate altitude for baro 3
 				vario1.calculateAltVspeed(baro3.altitudeCm , baro3.altIntervalMicros); 
+			}
+		} else if (baro4.baroInstalled) {                                        // check if baro 4 (LPS22HB) is present
+			if ( baro4.getAltitude() == 0) {                                      // calculate altitude for baro 4
+				vario1.calculateAltVspeed(baro4.altitudeCm , baro4.altIntervalMicros); 
 			}
 		}
 
@@ -778,8 +790,8 @@ void setup() {
 		//	init_inav_frsky();						// LTM UART auf GP4 starten
 		//}    
 
-    // Empfänger / Telemetrie-Protokoll Initialisierung
-    if (config.protocol == 'C') {		// CRSF Protokoll
+        // Empfänger / Telemetrie-Protokoll Initialisierung
+        if (config.protocol == 'C') {		// CRSF Protokoll
 			setupCrsfIn();							// Primären Rx-UART einrichten
 			setupCrsf2In();							// Sekundären Rx-UART einrichten
 			setupCrsfOut();							// CRSF TX PIO/DMA einrichten
@@ -844,7 +856,7 @@ void loop() {
 
 
     // 2. Phase: Nach 4 Sekunden schaltet der normale oXs-Ablauf ein
-    if (((configIsValid) and (configIsSaved)) or (config.inav_ltm >= 1)) {
+    if (((configIsValid) and (configIsSaved)) or (config.inav_ltm > 0)) {  // only if config is valid or inav_ltm is active, we run the main loop
 
 
 
@@ -1002,11 +1014,11 @@ int main() {
     
     while(1) {
         // Solange wir in den ersten 4 Sekunden sind, überspringen wir den loop()
-        if (millisRp() < 4000) {
+       /* if (millisRp() < 4000) {
             watchdog_update(); // Verhindert den Hardware-Reset des RP2040
             waitUs(1000);      // 1 Millisekunde Pause im Leerlauf
             continue;          // Springt sofort wieder an den Anfang der while(1)
-        }
+        }*/
         
         // Erst nach 4 Sekunden wird der normale oXs-Loop ausgeführt
         loop();
@@ -1041,7 +1053,7 @@ void loop1() {
     uint8_t qCmd;
 
     // Wenn inav_ltm == 0 ist, läuft die originale oXs-Sensorverarbeitung
-    if (config.inav_ltm == 0) {
+    if (config.inav_ltm == config.inav_ltm) {          //0
 
         getSensors(); // get sensor
 
@@ -1090,12 +1102,12 @@ void core1_main() {
     
     while(1) {
         // Solange wir in den ersten 4 Sekunden sind, überspringen wir loop1()
-        if (millisRp() < 4000) {
+        /*if (millisRp() < 4000) {
             // Hier erlauben wir Core 1 im Hintergrund sicher zu atmen,
             // ohne dass er die zeitkritischen Sensor-Loops triggert.
             waitUs(1000); 
             continue; // Springt sofort wieder an den Anfang der while(1)
-        }
+        }*/
         
         // Erst nach 4 Sekunden starten die Core-1-Sensoren und Tasks
         loop1();

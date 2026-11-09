@@ -92,7 +92,7 @@
 #define GPS_FRAME_INTERVAL 500     // This frame contains longitude, latitude, altitude, ground speed, heading and number of satellites
 #define ATTITUDE_FRAME_INTERVAL 500 // This should normally contains pitch, roll and yaw.
 #define BARO_ALTITUDE_FRAME_INTERVAL 500 // This frame contains only barometric relative altitude
-
+#define TEMP_FRAME_INTERVAL 1000 // Zusatzdaten
 
 // -------------- for Futaba Sbus2 protocol -----------------------
 // For temperature, oXs emulates a SBS/01T
@@ -361,6 +361,8 @@
 #define _accScaleYZ 0.0;
 #define _pinHigh 255;   // force a level High on this pin (when defined between 0 and 29)
 #define _pinLow 255;   // force a level Low on this pin (when defined between 0 and 29)
+#define _rth_min_Dist 60;
+#define _rth_min_Speed 2;
 
 // =================================================================
 // ZENTRALE AUSWAHL: Hier das gewünschte Protokoll eintragen (1, 2, 3 oder 4)

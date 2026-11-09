@@ -20,6 +20,7 @@
 //extern queue_t gpsQueue ;
 extern CONFIG config;
 extern field fields[];  // list of all telemetry fields and parameters used by Sport
+extern uint8_t debugVal;
 
 queue_t gpsRxQueue ; // queue uses to push the data from the uart pio rx to the main loop
 
@@ -414,142 +415,304 @@ void GPS::readGpsUblox(){
 }
 
 
+
 bool GPS::parseGpsUblox(void) // move the data from buffer to the different fields
 {
     uint8_t * pvelned =  (uint8_t *) &_buffer.velned; // only for debug
         
+    // =========================================================================
+    // ⚙️ KONFIGURATION & FILTER-GRENZWERTE (EINSTELLUNGEN IM KOPF)
+    // =========================================================================
+    const uint8_t  MIN_SATELLITES_FOR_LOCK = 6;    // Mindestanzahl Satelliten für den Home-Lock
+    const int32_t  MAX_PDOP_FOR_LOCK       = 350;  // Maximaler PDOP (350 = 3.5) für hohe Präzision
+    const uint64_t LOCK_DURATION_US        = 9000000ULL; // Stabile Zeit in Mikrosekunden (9 Sek.)
+    
+    // =========================================================================
+    // 💾 STATISCHE VARIABLEN (ZUSTANDSSPEICHER)
+    // =========================================================================
+    //static int32_t GPS_custom_steering = 5000; 
+    //static uint64_t stable_start_us = 0;
+    //static bool home_is_locked = false;
+    static uint32_t last_debug_ms = 0; // Für die zeitliche Drosselung der Textausgabe
+
+    // =========================================================================
+    // 🚀 ORBIT- & RTH-PARAMETER 
+    // =========================================================================   
+    const float    DEFAULT_RTH_MIN_DIST    = 5.0f;       // Radius/Distanz zu Home in Metern (z.B. 5.0f für Auto, 80.0f für ASK 14)
+    const int32_t  DEFAULT_RTH_MIN_SPEED   = 30;         // Mindestgeschwindigkeit in cm/s (z.B. 30 für Gehtest, 300 für ASK 14)
+    const float    RTH_GAIN_FACTOR         = 1.5f;       // Aggressivität der Anflug-Lenkung
+    
     // do we have new position information?
     new_position = false ;
     new_speed = false ;
     static bool next_fix = false ;
-    //printf(" %X\n", _msg_id);
+    uint8_t current_sats = GPS_home_lock_sats;
+  
+    // 🛑 SICHERHEITS-RIEGEL: Ignoriere Puffer-Müll im Einschaltmoment
+    // Erst wenn das GPS-Modul das erste Mal sauber antwortet (PDOP nicht mehr 9999 oder 0),
+    // wird die Funktion überhaupt freigeschaltet.
+    if (GPS_pdop == 9999 || GPS_pdop == 0) {
+        GPS_custom_steering = 5000; // Standard-Mitte erzwingen
+        current_sats = 0;
+        sent2Core0(HEADING, 5000);  // Telemetrie mit 5000 initialisieren, um -1 zu verhindern
+        // return false;               // Funktion vorzeitig abbrechen
+    }
+
     switch (_msg_id) {
+
     case MSG_POSLLH:
-        //i2c_dataset.time                = _buffer.posllh.time;
+    { // START DES LOCAL SCOPES
+
         gpsInstalled = true;
-        if (next_fix) {                               // enable state if a position has been received after a positieve STATUS or SOL
+
+        // 🟢 IMMER TELEMETRIE SENDEN: Koordinaten & Höhe sofort aktualisieren bei Empfang
+        sent2Core0(LONGITUDE, _buffer.posllh.longitude);           
+        sent2Core0(LATITUDE, _buffer.posllh.latitude);            
+        sent2Core0(ALTITUDE, _buffer.posllh.altitude_msl / 10);       
+
+        // 🛰️ SAT-ABFRAGE KORRIGIERT (liest aus den gefüllten PVT/SOL Puffern)
+        uint8_t current_sats = GPS_home_lock_sats; 
+        if (current_sats > 100) current_sats -= 100;
+        if (current_sats > 50) current_sats -= 50;
+
+        if (current_sats == 0) { 
+            current_sats = _buffer.solution.satellites;
+            if (current_sats > 100) current_sats -= 100;
+        }
+
+        // 🔒 Die Maske: Wenn das GPS noch bootet (PDOP 9999), löschen wir die 123 / 23 Geister-Satelliten komplett
+        if (GPS_pdop == 9999 || GPS_pdop == 0) {
+            current_sats = 0;
+        }
+
+        if (next_fix) {                               
             GPS_fix = true ;
-            sent2Core0(LONGITUDE, _buffer.posllh.longitude);           // in degree with 7 decimals
-            sent2Core0(LATITUDE, _buffer.posllh.latitude);            // in degree with 7 decimals
-            sent2Core0(ALTITUDE, _buffer.posllh.altitude_msl / 10);       //alt in mm in converted in cm (sport uses cm)
-            //printf("POSLLH alt_msl  alt_ellipsoid = %d  %d\n", _buffer.posllh.altitude_msl / 10 , _buffer.posllh.altitude_ellipsoid /10);
-            if ( GPS_home_lat == 0 ) { 
-              GPS_home_lat = _buffer.posllh.latitude ;  // save home position
-              GPS_home_lon = _buffer.posllh.longitude ;
-              GPS_last_lat = _buffer.posllh.latitude ;  // use dto calculate the cumulative distance
-              GPS_last_lon = _buffer.posllh.longitude ;
-              GPS_cumulativeDistCm =  0; 
-              GPS_scale = cosf(GPS_home_lat * 1.0e-7f * DEG_TO_RAD_FOR_GPS); // calculate scale factor based on latitude
+        } else {
+            GPS_fix = false;
+        }
+
+        // 🔒 SMART-FILTER FÜR DEN HOME-LOCK
+        //if (next_fix && current_sats >= MIN_SATELLITES_FOR_LOCK && GPS_pdop > 0 && GPS_pdop < MAX_PDOP_FOR_LOCK) {                               
+        // GPS_fix_type wird in PVT/SOL sauber gesetzt und bleibt im POSLLH-Block erhalten!
+        if (GPS_fix_type == FIX_3D && current_sats >= MIN_SATELLITES_FOR_LOCK && GPS_pdop > 0 && GPS_pdop < MAX_PDOP_FOR_LOCK) {
+
+            if (!home_is_locked) {
+                uint64_t current_us = to_us_since_boot(get_absolute_time()); 
+                
+                if (stable_start_us == 0) {
+                    stable_start_us = current_us;
+                }
+
+                // Wenn die Signalqualität dauerhaft für die eingestellte Zeit stabil bleibt
+                if (current_us - stable_start_us >= LOCK_DURATION_US) { 
+                    GPS_home_lat = _buffer.posllh.latitude;
+                    GPS_home_lon = _buffer.posllh.longitude;
+                    GPS_last_lat = GPS_home_lat;  
+                    GPS_last_lon = GPS_home_lon;
+                    GPS_cumulativeDistCm = 0; 
+                    GPS_scale = cosf(GPS_home_lat * 1.0e-7f * DEG_TO_RAD_FOR_GPS); 
+                    home_is_locked = true; 
+                }
             }
-            // Calculate distance
-            sent2Core0(GPS_HOME_DISTANCE, 0.01 * GpsDistanceCm(GPS_home_lat - _buffer.posllh.latitude , GPS_home_lon - _buffer.posllh.longitude ));
-             // calculate bearing
+        } else {
+            // Signalqualität kurzzeitig eingebrochen -> Zeit-Filter zurücksetzen
+            if (!home_is_locked) {
+                stable_start_us = 0;
+            }
+        }
+            
+        // Berechnungen starten erst, wenn Home sicher eingeloggt ist
+        if (home_is_locked) {
+            float distance_m = 0.01f * GpsDistanceCm(GPS_home_lat - _buffer.posllh.latitude , GPS_home_lon - _buffer.posllh.longitude );
+            sent2Core0(GPS_HOME_DISTANCE, distance_m);
+            sent2Core0(TEMP1, distance_m);                
+
             int32_t off_x = _buffer.posllh.longitude - GPS_home_lon ;
             int32_t off_y = (_buffer.posllh.latitude - GPS_home_lat) / GPS_scale ;
-            GPS_bearing = 90 + atan2f(-off_y, off_x) * 57.2957795f;  // in degree
+            GPS_bearing = 90 + atan2f(-off_y, off_x) * 57.2957795f;  
             if (GPS_bearing < 0) GPS_bearing += 360;
+            
             sent2Core0(GPS_HOME_BEARING, (int32_t) GPS_bearing);
-            // calculate cumulative flow
+
+            // =========================================================================
+            // 🚀 FLIGHTCONTROLLER-ORBIT-LOGIK 
+            // =========================================================================
+            static int32_t last_ubx_lat = 0;
+            static int32_t last_ubx_lon = 0;
+            
+            // Nutzt config-Werte, falls vorhanden (> 0), andernfalls die neuen Kopf-Konstanten
+            float target_orbit_r  = (config.rth_min_Dist > 0)  ? config.rth_min_Dist  : DEFAULT_RTH_MIN_DIST;       
+            int32_t min_speed_cms = (config.rth_min_Speed > 0) ? config.rth_min_Speed : DEFAULT_RTH_MIN_SPEED;        
+            float gain_factor     = RTH_GAIN_FACTOR;          
+        
+
+            int32_t current_ubx_speed = GPS_live_speed_cms; // 🟢 Nutzt die sicher abgefangene Live-Geschwindigkeit
+
+            if (last_ubx_lat != 0 && last_ubx_lon != 0 && current_ubx_speed > min_speed_cms) {
+                float move_lat = (float)(_buffer.posllh.latitude - last_ubx_lat) * 0.0111139f;
+                float move_lon = (float)(_buffer.posllh.longitude - last_ubx_lon) * 0.0111139f * GPS_scale;
+                
+                float track_deg = atan2f(move_lon, move_lat) * 57.2957795f;
+                if (track_deg < 0.0f) track_deg += 360.0f;
+
+                float loiter_track = GPS_bearing + 90.0f;
+                if (loiter_track >= 360.0f) loiter_track -= 360.0f;
+
+                float approach_angle = (distance_m - target_orbit_r) * gain_factor; 
+                if (approach_angle > 45.0f)  approach_angle = 45.0f;  
+                if (approach_angle < -45.0f) approach_angle = -45.0f; 
+
+                float target_heading = loiter_track + approach_angle;
+                if (target_heading >= 360.0f) target_heading -= 360.0f;
+
+                float turn_angle = target_heading - track_deg;
+                if (turn_angle > 180.0f)  turn_angle -= 360.0f;
+                if (turn_angle < -180.0f) turn_angle += 360.0f;
+
+                float telemetry_value = ((turn_angle / 3.6f) + 50.0f) * 100.0f;
+                GPS_custom_steering = (int32_t)telemetry_value;
+            } else {
+                GPS_custom_steering = 5000; 
+            }
+
+            last_ubx_lat = _buffer.posllh.latitude;
+            last_ubx_lon = _buffer.posllh.longitude;
+
             int32_t deltaDistanceCm = GpsDistanceCm(GPS_last_lat - _buffer.posllh.latitude , GPS_last_lon - _buffer.posllh.longitude );
             if (deltaDistanceCm > 200 && deltaDistanceCm < 100000){
                 GPS_cumulativeDistCm += deltaDistanceCm;
                 GPS_last_lat = _buffer.posllh.latitude;
                 GPS_last_lon = _buffer.posllh.longitude;
             }
-            sent2Core0(GPS_CUMUL_DIST, GPS_cumulativeDistCm * 0.01) ;  // store in m
-            // store data used for LORA
-            GPS_last_fix_millis = millisRp() ;  // used by lora locator
-            GPS_last_fix_lon = _buffer.posllh.longitude ;      // used by lora locator
-            GPS_last_fix_lat = _buffer.posllh.latitude ;      // used by lora locator
+            sent2Core0(GPS_CUMUL_DIST, GPS_cumulativeDistCm * 0.01) ;  
+            sent2Core0(HEADING, GPS_custom_steering);
         } else {
-            GPS_fix = false;
+            // Sicherheits-Fallback: Mitte solange kein Lock da ist
+            GPS_custom_steering = 5000;
+            sent2Core0(GPS_HOME_BEARING, (int32_t) GPS_bearing);
         }
-        //fields[LONGITUDE].available = GPS_fix;           // in degree with 7 decimals
-        //fields[LATITUDE].available = GPS_fix;
-        //fields[ALTITUDE].available = GPS_fix; 
+ 
+        // 🛠️ SERIELLE TESTAUSGABE (Gedrosselt auf 1Hz / einmal pro Sekunde bei debugVal == 'Y')
+        if (debugVal == 'Y' && (millisRp() - last_debug_ms >= 1000)) {
+            last_debug_ms = millisRp();
+            uint64_t time_stable_sec = 0;
+            if (stable_start_us > 0 && !home_is_locked) {
+                time_stable_sec = (to_us_since_boot(get_absolute_time()) - stable_start_us) / 1000000ULL;
+            }
+            printf("[GPS-RTH] Sats: %u | PDOP: %d | 3DFix: %s | HomeLock: %s (Stable: %llu s) | Dist: %.1fm | Bearing: %.1f Grad | Steering: %d\n",
+                   current_sats, (int)GPS_pdop, next_fix ? "YES" : "NO", home_is_locked ? "LOCKED" : "WAIT", 
+                   time_stable_sec, (home_is_locked ? (0.01f * GpsDistanceCm(GPS_home_lat - _buffer.posllh.latitude , GPS_home_lon - _buffer.posllh.longitude )) : 0.0f), 
+                   (float)GPS_bearing, (int)GPS_custom_steering);
+
+        }
+
+        GPS_last_fix_millis = millisRp() ;  
+        GPS_last_fix_lon = _buffer.posllh.longitude ;      
+        GPS_last_fix_lat = _buffer.posllh.latitude ;      
+        
         new_position = true;
         break;
-//    case MSG_STATUS:                              // !!!!!!!!! I do not see real need of this message because same (and more) data are in SOL, so this message is not activated in init
-//        next_fix = (_buffer.status.fix_status & NAV_STATUS_FIX_VALID) && (_buffer.status.fix_type == FIX_3D); // si valid position and speed or 3D fix
-//        if (!next_fix)
-//             GPS_fix = false;
-//        break;
-    case MSG_SOL:                                // !!!! here we could also use vertical speed which is I4 in cm/sec)
+    } // ENDE DES LOCAL SCOPES
+
+    case MSG_SOL:                                
+    { // 
         next_fix = (_buffer.solution.fix_status & NAV_STATUS_FIX_VALID) && (_buffer.solution.fix_type == FIX_3D);
-        GPS_fix_type = _buffer.solution.fix_type; // use to send or not the data in Hott and ELRS
+        GPS_fix_type = _buffer.solution.fix_type; 
         if (!next_fix)
              GPS_fix = false;
-        //fields[NUMSAT].available = true;
-        if ( _buffer.solution.fix_type == FIX_3D ) _buffer.solution.satellites += 100; // we add 100 when we have a 3d fix (for Ublox)
-        sent2Core0(NUMSAT, _buffer.solution.satellites); 
-        if ( _buffer.solution.fix_status & NAV_STATUS_FIX_VALID) { // PDOP is valid only when bit 0 =1  
+        if ( _buffer.solution.fix_type == FIX_3D ) _buffer.solution.satellites += 50; //100
+        
+        GPS_home_lock_sats = _buffer.solution.satellites;
+
+        // 🔒 +100 Logik für NUMSAT bei aktivem Home-Lock
+        uint8_t sats_to_send = _buffer.solution.satellites;
+        if (home_is_locked) {
+            sats_to_send += 50; //100
+        }
+        sent2Core0(NUMSAT, sats_to_send); 
+
+        if ( _buffer.solution.fix_status & NAV_STATUS_FIX_VALID) {   
             GPS_pdop = _buffer.solution.position_DOP;
             sent2Core0(GPS_PDOP, _buffer.solution.position_DOP);
         }
-        //printf("nbr sat : %X \n", GPS_numSat) ; 
         break;
-    case MSG_PVT:                                // this message does not exist in ublox6 (but SOL does not exist in ublox10)
+    } // 
+
+         
+    case MSG_PVT:                                
+    {
         next_fix = (_buffer.pvt.fix_status & NAV_STATUS_FIX_VALID) && (_buffer.pvt.fix_type == FIX_3D);
-        GPS_fix_type = _buffer.pvt.fix_type; // use to send or not the data in Hott and ELRS
-        if (!next_fix)
+        GPS_fix_type = _buffer.pvt.fix_type; 
+        
+        if (!next_fix) {
              GPS_fix = false;
-        //fields[NUMSAT].value = _buffer.pvt.satellites; 
-        //fields[NUMSAT].available = true;
-        if ( _buffer.pvt.fix_type == FIX_3D ) _buffer.pvt.satellites += 100; // we add 100 when we have a 3d fix (for Ublox)
-        sent2Core0(NUMSAT, _buffer.pvt.satellites); 
-        if ( _buffer.pvt.fix_status & NAV_STATUS_FIX_VALID) { // PDOP is valid only when bit 0 =1  
+        } else {
+             GPS_fix = true;
+        }
+        
+        if ( _buffer.pvt.fix_type == FIX_3D ) _buffer.pvt.satellites += 50; //100
+        
+        GPS_home_lock_sats = _buffer.pvt.satellites;
+
+        // 🔒 +100 Logik für NUMSAT bei aktivem Home-Lock
+        uint8_t sats_to_send = _buffer.pvt.satellites;
+        if (home_is_locked) {
+            sats_to_send += 50; //100
+        }
+        sent2Core0(NUMSAT, sats_to_send); 
+        
+        if ( _buffer.pvt.fix_status & NAV_STATUS_FIX_VALID) {   
             GPS_pdop = _buffer.pvt.position_DOP;
             sent2Core0(GPS_PDOP, _buffer.pvt.position_DOP);
         }
-        //if (_buffer.timeutc.flag & 0b111) {
-        if (( _buffer.pvt.valid & 0x03) == 0X03 ){ // if date and time are valid (bit 0 and 1 = HIGH)
-            //printf("nbr sat : %X \n", GPS_numSat) ;
-            gpsDate =_buffer.pvt.year % 100;
-            gpsDate <<= 8;
-            gpsDate += _buffer.pvt.month;
-            gpsDate <<= 8;
-            gpsDate += _buffer.pvt.day;
-            gpsDate <<= 8;
-            gpsDate += 0xFF;
-            gpsTime = _buffer.pvt.hour;
-            gpsTime <<= 8;
-            gpsTime += _buffer.pvt.min;
-            gpsTime <<= 8;
-            gpsTime += _buffer.pvt.sec;
-            gpsTime <<= 8;
-            if ( prevGpsTime != gpsTime) {
+        
+        
+        if ((_buffer.pvt.valid & 0x03) == 0x03) { 
+            uint16_t uYear  = _buffer.pvt.year;
+            uint8_t  uMonth = _buffer.pvt.month;
+            uint8_t  uDay   = _buffer.pvt.day;
+            uint8_t  uHour  = _buffer.pvt.hour;
+            uint8_t  uMin   = _buffer.pvt.min;
+            uint8_t  uSec   = _buffer.pvt.sec;
+
+            gpsDate = ((uint32_t)uDay * 1000000) + 
+                      ((uint32_t)uMonth * 10000) + 
+                      ((uint32_t)(uYear % 100) * 100);
+            
+            gpsTime = ((uint32_t)uHour * 1000000) + 
+                      ((uint32_t)uMin * 10000) + 
+                      ((uint32_t)uSec * 100);
+            
+            if (prevGpsTime != gpsTime) {
                 prevGpsTime = gpsTime; 
                 sent2Core0(GPS_DATE , gpsDate);
                 sent2Core0(GPS_TIME , gpsTime);
             }
-        }    
-        break;
+        } else {
+            gpsDate = 0;
+            gpsTime = 0;
+            prevGpsTime = 0;
+            sent2Core0(GPS_DATE , 0);
+            sent2Core0(GPS_TIME , 0);
+        }
+    }
+    break;
+              
     case MSG_VELNED:   
-        if( GPS_fix) sent2Core0(GROUNDSPEED , _buffer.velned.speed_3d ) ; 
-        //fields[GROUNDSPEED].value  = _buffer.velned.speed_3d;  // cm/s
-        //fields[GROUNDSPEED].available = GPS_fix ;
-        //GPS_speed_2d = _buffer.velned.speed_2d;    // cm/s
-        //GPS_speed_2dAvailable = GPS_fix ;
-        if( GPS_fix) sent2Core0(HEADING , _buffer.velned.heading_2d /1000 ) ; 
-        //fields[HEADING].value = _buffer.velned.heading_2d /1000;     // Heading 2D deg with 5 decimals is reduced to 2 décimals
-        //fields[HEADING].available = GPS_fix ;
+        if( GPS_fix) {
+            GPS_live_speed_cms = _buffer.velned.speed_3d; // 🟢 HIER DIE ECHTE GESCHWINDIGKEIT SICHERN
+            sent2Core0(GROUNDSPEED , _buffer.velned.speed_3d ) ; 
+            //sent2Core0(HEADING , GPS_custom_steering); 
+        }
+
+        
         new_speed = true;
-        //printf("spd= %f   Head= %f\n", _buffer.velned.speed_3d , _buffer.velned.heading_2d);
-        //for (uint8_t i=0 ; i<36; i++){
-        //    printf(" %X", _buffer.bytes[i]);
-        //}
-        //printf("  spd= %" PRIu32 "\n", _buffer.velned.heading_2d );
-        //for (uint8_t i = 0 ; i < 36 ; i++){
-        //    printf(".%X",    *(pvelned + i ) );
-        //}    
-        //printf("  fld= %" PRIi32 "\n" , fields[HEADING].value);
         break;
+        
     default:
         return false;
     } // end of case
 
-    // we only return true when we get new position and speed data
-    // this ensures we don't use stale data
     if (new_position && new_speed) {
         new_speed = new_position = false;
         return true;
@@ -557,29 +720,8 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
     return false;
 }
 
-/*
-//  For casic GPS
-void GPS::setupGpsCasic(void){    // for casic gps
-    // clear the input queue that is filled by the interrupt
-    queue_init(&gpsQueue , 1 ,256) ;// queue for uart0 with 256 elements of 1
-    
-    uart_init(GPS_UART_ID, 38400);   // setup UART0 at 38400 baud
-    uart_set_hw_flow(GPS_UART_ID, false, false);// Set UART flow control CTS/RTS, we don't want these, so turn them off
-    uart_set_fifo_enabled(GPS_UART_ID, false);    // Turn off FIFO's - we want to do this character by character
-    
-    gpio_set_function(GPS_TX_PIN , GPIO_FUNC_UART); // Set the GPIO pin mux to the UART 
-    gpio_set_function(GPS_RX_PIN , GPIO_FUNC_UART);
-    // And set up and enable the interrupt handlers
-    irq_set_exclusive_handler(UART0_IRQ, on_uart_rx);
-    irq_set_enabled(UART0_IRQ, true);
-    // Now enable the UART to send interrupts - RX only
-    uart_set_irq_enables(GPS_UART_ID, true, false);
-    busy_wait_us(1000);
-    uint8_t dummy;
-    while (! queue_is_empty (&gpsQueue)) queue_try_remove ( &gpsQueue , &dummy ) ;
-    _step = 0;
-}  // end setupGPS
-*/   
+
+
 
 void GPS::readGpsCasic() { // read and process GPS data. do not send them.// for casic gps
     uint8_t data;
@@ -644,12 +786,12 @@ bool GPS::parseGpsCasic(void) // move the data from buffer to the different fiel
     gpsInstalled = true;
     sent2Core0(NUMSAT, _casicBuffer.nav_pv.numSV);
     //fields[NUMSAT].available = true;
-    if ( _casicBuffer.nav_pv.velValid >= 6) {
+    if ( _casicBuffer.nav_pv.velValid >= 7) {
         GPS_speed_2d  = _casicBuffer.nav_pv.speed2D;
         GPS_speed_2dAvailable  = true;
     }    
-    if ( _casicBuffer.nav_pv.velValid >= 7) {
-        sent2Core0(NUMSAT,  _casicBuffer.nav_pv.numSV + 100); // add 100 if 3d fix available
+    if ( _casicBuffer.nav_pv.velValid >= 6) {
+        sent2Core0(NUMSAT,  _casicBuffer.nav_pv.numSV + 50); // add 50 if 3d fix available
         sent2Core0(GROUNDSPEED, _casicBuffer.nav_pv.speed3D * 100); // in ublox = cm/sec, in CASIC float M/sec
         int32_t casicLat = (int32_t)( _casicBuffer.nav_pv.lat* 10000000);
         int32_t casicLon = (int32_t)( _casicBuffer.nav_pv.lon* 10000000);

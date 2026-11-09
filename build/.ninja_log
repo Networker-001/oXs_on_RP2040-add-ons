@@ -1,50 +1,50 @@
 # ninja log v5
-192	788	8144454308689341	CMakeFiles/oXs.dir/src/inav_ltm.cpp.obj	b6baec0a9fb020d2
+264	1078	8157576705785982	CMakeFiles/oXs.dir/src/inav_ltm.cpp.obj	b6baec0a9fb020d2
 992	1350	8114202938594267	CMakeFiles/oXs.dir/src/mpu_bu.cpp.obj	923c78e0011a879d
-22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+22	43	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
 145	317	8089390003359117	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_exbus_tx_rx.pio.h	b5b16c94010f6c79
 926	1198	8114202936960632	CMakeFiles/oXs.dir/src/mpu_-_mahony_for_vario.cpp.obj	c6bc177544e1e269
 128	317	8089390003323599	uart_sport_tx_rx.pio.h	18c0bb93a94b06b8
 128	317	8089390003323599	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_sport_tx_rx.pio.h	18c0bb93a94b06b8
+250	1671	8157576711921439	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
 168	328	8089390003359117	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_frsky_hub_tx.pio.h	350c6c8f3e9d7421
-56	436	8145590319023384	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
 2499	3851	8114202962744576	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_bootrom/bootrom.c.obj	6488a0c1d7994d5b
 145	317	8089390003359117	uart_exbus_tx_rx.pio.h	b5b16c94010f6c79
-95	1226	8114202937454288	CMakeFiles/oXs.dir/src/MPU6050.cpp.obj	b3862ceb2df0b141
+57	1379	8154300547033608	CMakeFiles/oXs.dir/src/MPU6050.cpp.obj	b3862ceb2df0b141
 160	342	8089390003601699	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_esc_rx.pio.h	a43c0c144a74d335
 90	317	8089390003359117	uart_ibus_tx_rx.pio.h	675715673c53f897
-174	723	8144454308053461	CMakeFiles/oXs.dir/src/ibus_in.cpp.obj	90e5eebe82a770ba
+236	999	8157576705229125	CMakeFiles/oXs.dir/src/ibus_in.cpp.obj	90e5eebe82a770ba
 136	318	8089390003323599	uart_srxl2_tx_rx.pio.h	bb296396af414e1e
 168	328	8089390003359117	uart_frsky_hub_tx.pio.h	350c6c8f3e9d7421
 90	317	8089390003359117	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_ibus_tx_rx.pio.h	675715673c53f897
 136	318	8089390003323599	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_srxl2_tx_rx.pio.h	bb296396af414e1e
 52	318	8089390003323599	uart_crsf_tx.pio.h	222a9c1b4d731c1f
 465	1020	8114202935158799	CMakeFiles/oXs.dir/src/helper_3dmath.cpp.obj	a15642423aafac74
-89	715	8144454307801275	CMakeFiles/oXs.dir/src/crsf_in.cpp.obj	5899a8733b9524ca
-61	526	8144454305902449	CMakeFiles/oXs.dir/src/BMP280.cpp.obj	f33840d1f0d358c2
-73	685	8144454307545602	CMakeFiles/oXs.dir/src/SPL06.cpp.obj	50f7bf62819b27dc
+100	867	8157576703622436	CMakeFiles/oXs.dir/src/crsf_in.cpp.obj	5899a8733b9524ca
+57	538	8157576700693119	CMakeFiles/oXs.dir/src/BMP280.cpp.obj	f33840d1f0d358c2
+74	670	8157576702007230	CMakeFiles/oXs.dir/src/SPL06.cpp.obj	50f7bf62819b27dc
 52	318	8089390003323599	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_crsf_tx.pio.h	222a9c1b4d731c1f
 110	329	8089390003346079	uart_mpx_tx_rx.pio.h	b55bf5d325fe0504
 110	329	8089390003346079	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_mpx_tx_rx.pio.h	b55bf5d325fe0504
 2410	6204	8114202984154587	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_printf/printf.c.obj	49816be6b5a946c5
 61	333	8089390003404633	uart_gps_rx.pio.h	7932c51f6176007b
 160	342	8089390003601699	uart_esc_rx.pio.h	a43c0c144a74d335
-78	617	8144454306757387	CMakeFiles/oXs.dir/src/XGZP6897D.cpp.obj	3c2f4a2c7dc8ce50
+81	603	8157576701021615	CMakeFiles/oXs.dir/src/XGZP6897D.cpp.obj	3c2f4a2c7dc8ce50
 2509	4415	8114202968423541	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_divider/divider.S.obj	cea49a936aa03013
 152	335	8089390003477340	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_logger_tx.pio.h	d02f62d403006b6a
 61	333	8089390003404633	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_gps_rx.pio.h	7932c51f6176007b
 70	335	8089390003561460	uart_gps_tx.pio.h	26da8055aea4431c
-121	716	8144454308023306	CMakeFiles/oXs.dir/src/fbus.cpp.obj	8b47b52b5a4ac70a
+152	1031	8157576705517049	CMakeFiles/oXs.dir/src/fbus.cpp.obj	8b47b52b5a4ac70a
 70	335	8089390003561460	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_gps_tx.pio.h	26da8055aea4431c
 152	335	8089390003477340	uart_logger_tx.pio.h	d02f62d403006b6a
 4968	9546	8114203019917942	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_stdio_usb/stdio_usb_descriptors.c.obj	e45c4f6a7978b216
-129	748	8144454308356847	CMakeFiles/oXs.dir/src/frsky_hub.cpp.obj	86057a49d015a30b
+167	1062	8157576705667936	CMakeFiles/oXs.dir/src/frsky_hub.cpp.obj	86057a49d015a30b
 89	490	8114202929856994	CMakeFiles/oXs.dir/src/KalmanFilter4D.cpp.obj	64a2429eeba5bedf
 119	336	8089390003520166	uart_sbus_tx.pio.h	4dd3456ba59e1865
 177	459	8089390004841728	pico-sdk/src/rp2_common/boot_stage2/CMakeFiles/bs2_default.dir/compile_time_choice.S.obj	1196ac61a708e37b
 119	336	8089390003520166	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_sbus_tx.pio.h	4dd3456ba59e1865
 2122	2580	8114202950524203	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_timer/timer.c.obj	53f18e9e38a914fb
-147	874	8144454309605969	CMakeFiles/oXs.dir/src/gyro.cpp.obj	eb8848223e063dd1
+194	1215	8157576707343640	CMakeFiles/oXs.dir/src/gyro.cpp.obj	eb8848223e063dd1
 80	341	8089390003621831	uart_hott_tx_rx.pio.h	e20d94e694514b04
 460	728	8089390006154791	pico-sdk/src/rp2_common/boot_stage2/bs2_default.elf	1bb8be4b2d2a689b
 132	378	8114202928696609	CMakeFiles/oXs.dir/src/crc.cpp.obj	846dab7d4fb63975
@@ -60,56 +60,57 @@
 728	809	8089390008372565	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/pico-sdk/src/rp2_common/boot_stage2/bs2_default.bin	1ad646fbcf8ef98
 2058	2446	8114202949453853	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_sync/critical_section.c.obj	89c911dd36c444f
 809	967	8089390009907699	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/pico-sdk/src/rp2_common/boot_stage2/bs2_default_padded_checksummed.S	2a78d91c24eb3c26
-144	887	8144454790337737	CMakeFiles/oXs.dir/src/sbus_out_pwm.cpp.obj	71bec290a711383c
+1078	1924	8157576714663566	CMakeFiles/oXs.dir/src/sbus_out_pwm.cpp.obj	71bec290a711383c
 84	414	8114202929268632	CMakeFiles/oXs.dir/src/KalmanFilter.cpp.obj	da72e47435e81bc6
 7252	10122	8114203023078347	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/lib/tinyusb/src/class/dfu/dfu_rt_device.c.obj	74eab8f686fb1e94
 62	561	8142970995820868	CMakeFiles/oXs.dir/src/EMFButton.cpp.obj	b4f4a30a64daf42
-71	640	8144454787727393	CMakeFiles/oXs.dir/src/kx134.cpp.obj	3a6d7e23cfdb2d4d
+558	1367	8157576708706613	CMakeFiles/oXs.dir/src/kx134.cpp.obj	3a6d7e23cfdb2d4d
 2004	2380	8114202948839958	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_sync/lock_core.c.obj	5110a1466634a5d4
 78	630	8114202931054900	CMakeFiles/oXs.dir/src/I2Cdev.cpp.obj	5250fad4dcc5bf7c
 2675	5041	8114202973451274	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_double/double_v1_rom_shim.S.obj	662f7a1b27fe7d7d
-112	893	8144454309829366	CMakeFiles/oXs.dir/src/exbus.cpp.obj	dd291a4b002e4c7f
+140	1312	8157576708225674	CMakeFiles/oXs.dir/src/exbus.cpp.obj	dd291a4b002e4c7f
 158	992	8114202934679160	CMakeFiles/oXs.dir/src/ds18b20.cpp.obj	8c2f26ef16af9698
-67	673	8144454307427939	CMakeFiles/oXs.dir/src/MS5611.cpp.obj	5f95ecd40ecb4f65
-103	803	8144454308867360	CMakeFiles/oXs.dir/src/esc.cpp.obj	3486230323d4328
-83	619	8144454306797594	CMakeFiles/oXs.dir/src/ads1115.cpp.obj	6260cd974d85d83f
-65	1227	8145515658163447	CMakeFiles/oXs.dir/src/crsf_out.cpp.obj	5a10940ba99e81b2
-138	885	8144454309733686	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
-155	922	8144454310074706	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+66	558	8157576700815528	CMakeFiles/oXs.dir/src/MS5611.cpp.obj	5f95ecd40ecb4f65
+128	1015	8157576705369874	CMakeFiles/oXs.dir/src/esc.cpp.obj	3486230323d4328
+90	774	8157576702872759	CMakeFiles/oXs.dir/src/ads1115.cpp.obj	6260cd974d85d83f
+110	1096	8157576706172381	CMakeFiles/oXs.dir/src/crsf_out.cpp.obj	5a10940ba99e81b2
+56	334	8158536661021288	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+208	1147	8157576706514093	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
 1160	1438	8114202939434365	CMakeFiles/oXs.dir/src/rfm95.cpp.obj	86306384d10e40ba
-527	1062	8144454311552605	CMakeFiles/oXs.dir/src/jeti.cpp.obj	3a12a6c57fc99d5c
-165	795	8144454308789288	CMakeFiles/oXs.dir/src/ibus.cpp.obj	ac3534a82770f094
+538	1500	8157576710236681	CMakeFiles/oXs.dir/src/jeti.cpp.obj	3a12a6c57fc99d5c
+222	1046	8157576705517049	CMakeFiles/oXs.dir/src/ibus.cpp.obj	ac3534a82770f094
 2153	3549	8114202957876798	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_util/queue.c.obj	d4f4892004e25f36
-77	721	8144454788197254	CMakeFiles/oXs.dir/src/logger.cpp.obj	88be8bb6d003641a
-102	713	8144454788217398	CMakeFiles/oXs.dir/src/ms4525.cpp.obj	7ab1eeb9dc252f2b
-96	796	8144454789237629	CMakeFiles/oXs.dir/src/mpx.cpp.obj	d7e4d9461522cb01
-118	703	8144454788237594	CMakeFiles/oXs.dir/src/rpm.cpp.obj	4f4bae834006f62f
+603	1545	8157576710501404	CMakeFiles/oXs.dir/src/logger.cpp.obj	88be8bb6d003641a
+999	1693	8157576712183157	CMakeFiles/oXs.dir/src/ms4525.cpp.obj	7ab1eeb9dc252f2b
+75	327	8157598279025087	CMakeFiles/oXs.dir/src/mpx.cpp.obj	d7e4d9461522cb01
+1031	1654	8157576711705066	CMakeFiles/oXs.dir/src/rpm.cpp.obj	4f4bae834006f62f
 2184	2674	8114202951241749	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_pll/pll.c.obj	2a5e1243bb816339
-162	815	8144454789329142	CMakeFiles/oXs.dir/src/sequencer.cpp.obj	e2f1a655486a6bee
-127	778	8144454789027820	CMakeFiles/oXs.dir/src/sbus2_tlm.cpp.obj	cd83238685a83d77
-89	902	8144454790491616	CMakeFiles/oXs.dir/src/mpu.cpp.obj	d39576630d501c83
-135	724	8144454788521959	CMakeFiles/oXs.dir/src/sbus_in.cpp.obj	ae810caa6eb4d6d7
-83	842	8144454789878586	CMakeFiles/oXs.dir/src/main.cpp.obj	eb2b09bfa684da96
-152	795	8144454789146909	CMakeFiles/oXs.dir/src/sdp3x.cpp.obj	ebb2ec754e2ba73f
+1113	1775	8157576713123183	CMakeFiles/oXs.dir/src/sequencer.cpp.obj	e2f1a655486a6bee
+1046	1817	8157576713572872	CMakeFiles/oXs.dir/src/sbus2_tlm.cpp.obj	cd83238685a83d77
+60	354	8157605718605125	CMakeFiles/oXs.dir/src/mpu.cpp.obj	d39576630d501c83
+1062	1749	8157576712779697	CMakeFiles/oXs.dir/src/sbus_in.cpp.obj	ae810caa6eb4d6d7
+65	377	8157615146997666	CMakeFiles/oXs.dir/src/main.cpp.obj	eb2b09bfa684da96
+1096	1827	8157576713622809	CMakeFiles/oXs.dir/src/sdp3x.cpp.obj	ebb2ec754e2ba73f
 1880	2303	8114202947751903	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_irq/irq_handler_chain.S.obj	843e8d7d53656547
 1763	2142	8114202946349940	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_platform/platform.c.obj	57ddaf502ae4a9ae
-171	862	8144454789980254	CMakeFiles/oXs.dir/src/sport.cpp.obj	dedc52dd40f2aab9
-640	996	8144454791433615	CMakeFiles/oXs.dir/src/voltage.cpp.obj	daf89d70de268d88
+1148	1885	8157576714304641	CMakeFiles/oXs.dir/src/sport.cpp.obj	dedc52dd40f2aab9
+1545	2033	8157576715759656	CMakeFiles/oXs.dir/src/voltage.cpp.obj	daf89d70de268d88
 1808	2153	8114202946450576	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_sync/sync.c.obj	b724c55c555a1ffa
+59	253	8157598278381423	CMakeFiles/oXs.dir/src/lps22hb.cpp.obj	513ccee9d3045ff4
 1686	2184	8114202946834394	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_gpio/gpio.c.obj	78617221418dd207
-199	903	8144454790480358	CMakeFiles/oXs.dir/src/vario.cpp.obj	b265da29702908ba
-1464	2037	8143974845825279	CMakeFiles/oXs.dir/src/tools.cpp.obj	1a290bd14659bdce
+1500	2107	8157576716531064	CMakeFiles/oXs.dir/src/vario.cpp.obj	b265da29702908ba
+1368	2008	8157576715539789	CMakeFiles/oXs.dir/src/tools.cpp.obj	1a290bd14659bdce
 1656	2221	8114202947273162	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_stdlib/stdlib.c.obj	cb20b26803cb9c0c
 1791	2202	8114202946970147	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_claim/claim.c.obj	54438823cd2eac83
-703	1023	8144454791724822	CMakeFiles/oXs.dir/src/ws2812.cpp.obj	9094d66c97de457
+1640	2101	8157576716459940	CMakeFiles/oXs.dir/src/ws2812.cpp.obj	9094d66c97de457
 2554	4967	8114202973451274	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/pico_double/double_init_rom.c.obj	ee9f203b2c8f60fb
 1835	2410	8114202949190588	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_irq/irq.c.obj	6ae3ac94619a5480
-180	945	8144454790921822	CMakeFiles/oXs.dir/src/srxl2.cpp.obj	c2b7025d7f443abc
+1215	2126	8157576716726368	CMakeFiles/oXs.dir/src/srxl2.cpp.obj	c2b7025d7f443abc
 1944	2340	8114202948415348	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_sync/sem.c.obj	205e99bb88d5fd96
 2112	2509	8114202950238268	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_time/timeout_helper.c.obj	35883b1459c84417
-190	822	8144454789635196	CMakeFiles/oXs.dir/src/sx126x_driver.cpp.obj	1fec69394a10ca5f
+1312	1976	8157576715213556	CMakeFiles/oXs.dir/src/sx126x_driver.cpp.obj	1fec69394a10ca5f
 2047	2499	8114202949994617	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_sync/mutex.c.obj	4d3f396db996e7fd
-69	615	8145571758170249	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
+68	1454	8158336063410839	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
 2132	2535	8114202950481561	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/common/pico_util/datetime.c.obj	168d681623e714ed
 2203	2961	8114202953433021	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_vreg/vreg.c.obj	3ead33bed10b55a7
 2303	2848	8114202952133677	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_xosc/xosc.c.obj	5fff36f64daa2012
@@ -160,11 +161,183 @@
 10719	12953	8114203054705795	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/src/rp2_common/hardware_pio/pio.c.obj	abe0c728e0ab3166
 10028	12999	8114203055194063	CMakeFiles/oXs.dir/D_/Raspberry_PI_Piko_SDK/pico-sdk/lib/tinyusb/src/common/tusb_fifo.c.obj	d88195506a8e6f53
 54	4532	8110414966244363	oXs.elf	cd87ddc49aee0e39
-44	3009	8145620532841314	build.ninja	e980303d1d7b87e1
+51	828	8159163149924708	build.ninja	e980303d1d7b87e1
 52	82	8110444195352631	uart_frsky_master.pio.h	f4dd4a27786866f5
 52	82	8110444195352631	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/uart_frsky_master.pio.h	f4dd4a27786866f5
-436	3582	8145590321813901	FrSky_2_CRSF.elf	918671795bab5b43
+335	4931	8158536663708799	FrSky_2_CRSF.elf	c204ed434824413
 361	3658	8143942276737109	FrSky_2_HoTT.elf	1631f53b81c4f35a
-20	42	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
-55	1025	8145626309246812	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
-1025	4414	8145626312781022	FrSky_2_CRSF.elf	918671795bab5b43
+50	84	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+100	2041	8159191558589584	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+27	56	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+71	4826	8159192365267345	FrSky_2_CRSF.elf	c204ed434824413
+18	42	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+58	429	8159196975071524	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+429	5273	8159196978584646	FrSky_2_CRSF.elf	c204ed434824413
+33	64	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+87	459	8159200538037115	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+460	5254	8159200541448563	FrSky_2_CRSF.elf	c204ed434824413
+26	51	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+73	650	8159210164089935	CMakeFiles/oXs.dir/src/MS5611.cpp.obj	5f95ecd40ecb4f65
+87	681	8159210164229581	CMakeFiles/oXs.dir/src/XGZP6897D.cpp.obj	3c2f4a2c7dc8ce50
+95	719	8159210165073520	CMakeFiles/oXs.dir/src/ads1115.cpp.obj	6260cd974d85d83f
+67	748	8159210165093859	CMakeFiles/oXs.dir/src/BMP280.cpp.obj	f33840d1f0d358c2
+102	808	8159210165949444	CMakeFiles/oXs.dir/src/crsf_in.cpp.obj	5899a8733b9524ca
+80	835	8159210166012199	CMakeFiles/oXs.dir/src/SPL06.cpp.obj	50f7bf62819b27dc
+182	884	8159210166539146	CMakeFiles/oXs.dir/src/ibus_in.cpp.obj	90e5eebe82a770ba
+197	921	8159210166961657	CMakeFiles/oXs.dir/src/inav_ltm.cpp.obj	b6baec0a9fb020d2
+157	953	8159210167458954	CMakeFiles/oXs.dir/src/gyro.cpp.obj	eb8848223e063dd1
+133	969	8159210167331255	CMakeFiles/oXs.dir/src/fbus.cpp.obj	8b47b52b5a4ac70a
+141	1014	8159210167599756	CMakeFiles/oXs.dir/src/frsky_hub.cpp.obj	86057a49d015a30b
+173	1059	8159210168029165	CMakeFiles/oXs.dir/src/ibus.cpp.obj	ac3534a82770f094
+149	1129	8159210168292857	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+126	1160	8159210169458840	CMakeFiles/oXs.dir/src/exbus.cpp.obj	dd291a4b002e4c7f
+110	1223	8159210168981922	CMakeFiles/oXs.dir/src/crsf_out.cpp.obj	5a10940ba99e81b2
+118	1234	8159210169992955	CMakeFiles/oXs.dir/src/esc.cpp.obj	3486230323d4328
+165	1257	8159210170240294	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+681	1425	8159210171790374	CMakeFiles/oXs.dir/src/kx134.cpp.obj	3a6d7e23cfdb2d4d
+650	1487	8159210172684996	CMakeFiles/oXs.dir/src/jeti.cpp.obj	3a12a6c57fc99d5c
+719	1559	8159210173202797	CMakeFiles/oXs.dir/src/logger.cpp.obj	88be8bb6d003641a
+189	1599	8159210173792347	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+885	1674	8159210174260989	CMakeFiles/oXs.dir/src/ms4525.cpp.obj	7ab1eeb9dc252f2b
+953	1717	8159210174987272	CMakeFiles/oXs.dir/src/rpm.cpp.obj	4f4bae834006f62f
+1160	1772	8159210175433997	CMakeFiles/oXs.dir/src/sequencer.cpp.obj	e2f1a655486a6bee
+969	1785	8159210175618235	CMakeFiles/oXs.dir/src/sbus2_tlm.cpp.obj	cd83238685a83d77
+835	1800	8159210175871607	CMakeFiles/oXs.dir/src/mpx.cpp.obj	d7e4d9461522cb01
+1129	1802	8159210175931947	CMakeFiles/oXs.dir/src/sdp3x.cpp.obj	ebb2ec754e2ba73f
+808	1829	8159210176186425	CMakeFiles/oXs.dir/src/mpu.cpp.obj	d39576630d501c83
+1014	1855	8159210176462519	CMakeFiles/oXs.dir/src/sbus_in.cpp.obj	ae810caa6eb4d6d7
+1224	1883	8159210176753647	CMakeFiles/oXs.dir/src/sport.cpp.obj	dedc52dd40f2aab9
+1257	1925	8159210177167743	CMakeFiles/oXs.dir/src/sx126x_driver.cpp.obj	1fec69394a10ca5f
+748	1927	8159210177167743	CMakeFiles/oXs.dir/src/main.cpp.obj	eb2b09bfa684da96
+1425	1961	8159210177537611	CMakeFiles/oXs.dir/src/vario.cpp.obj	b265da29702908ba
+1060	1963	8159210177557809	CMakeFiles/oXs.dir/src/sbus_out_pwm.cpp.obj	71bec290a711383c
+1487	2006	8159210177959432	CMakeFiles/oXs.dir/src/voltage.cpp.obj	daf89d70de268d88
+1234	2027	8159210178040645	CMakeFiles/oXs.dir/src/srxl2.cpp.obj	c2b7025d7f443abc
+1559	2069	8159210178666816	CMakeFiles/oXs.dir/src/ws2812.cpp.obj	9094d66c97de457
+921	2307	8159210181065851	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
+2308	7154	8159210184540834	FrSky_2_CRSF.elf	c204ed434824413
+26	50	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+88	600	8159239456185215	CMakeFiles/oXs.dir/src/XGZP6897D.cpp.obj	3c2f4a2c7dc8ce50
+94	614	8159239456245486	CMakeFiles/oXs.dir/src/ads1115.cpp.obj	6260cd974d85d83f
+76	625	8159239456436358	CMakeFiles/oXs.dir/src/MS5611.cpp.obj	5f95ecd40ecb4f65
+69	636	8159239456662934	CMakeFiles/oXs.dir/src/BMP280.cpp.obj	f33840d1f0d358c2
+82	679	8159239457050794	CMakeFiles/oXs.dir/src/SPL06.cpp.obj	50f7bf62819b27dc
+100	711	8159239457030666	CMakeFiles/oXs.dir/src/crsf_in.cpp.obj	5899a8733b9524ca
+186	750	8159239457861304	CMakeFiles/oXs.dir/src/ibus_in.cpp.obj	90e5eebe82a770ba
+132	818	8159239458264402	CMakeFiles/oXs.dir/src/fbus.cpp.obj	8b47b52b5a4ac70a
+141	841	8159239458642066	CMakeFiles/oXs.dir/src/frsky_hub.cpp.obj	86057a49d015a30b
+116	852	8159239458637332	CMakeFiles/oXs.dir/src/esc.cpp.obj	3486230323d4328
+203	871	8159239458833991	CMakeFiles/oXs.dir/src/inav_ltm.cpp.obj	b6baec0a9fb020d2
+107	883	8159239458932272	CMakeFiles/oXs.dir/src/crsf_out.cpp.obj	5a10940ba99e81b2
+158	1012	8159239460348120	CMakeFiles/oXs.dir/src/gyro.cpp.obj	eb8848223e063dd1
+177	1038	8159239460459084	CMakeFiles/oXs.dir/src/ibus.cpp.obj	ac3534a82770f094
+149	1083	8159239460999136	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+124	1095	8159239461198030	CMakeFiles/oXs.dir/src/exbus.cpp.obj	dd291a4b002e4c7f
+167	1127	8159239461327852	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+614	1338	8159239463698211	CMakeFiles/oXs.dir/src/kx134.cpp.obj	3a6d7e23cfdb2d4d
+195	1350	8159239463718321	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+625	1423	8159239464546195	CMakeFiles/oXs.dir/src/logger.cpp.obj	88be8bb6d003641a
+600	1449	8159239464712222	CMakeFiles/oXs.dir/src/jeti.cpp.obj	3a12a6c57fc99d5c
+750	1450	8159239464692096	CMakeFiles/oXs.dir/src/ms4525.cpp.obj	7ab1eeb9dc252f2b
+841	1579	8159239465854072	CMakeFiles/oXs.dir/src/rpm.cpp.obj	4f4bae834006f62f
+871	1584	8159239465944533	CMakeFiles/oXs.dir/src/sbus_in.cpp.obj	ae810caa6eb4d6d7
+711	1588	8159239465934432	CMakeFiles/oXs.dir/src/mpx.cpp.obj	d7e4d9461522cb01
+679	1590	8159239465970630	CMakeFiles/oXs.dir/src/mpu.cpp.obj	d39576630d501c83
+637	1627	8159239466544955	CMakeFiles/oXs.dir/src/main.cpp.obj	eb2b09bfa684da96
+852	1639	8159239466668078	CMakeFiles/oXs.dir/src/sbus2_tlm.cpp.obj	cd83238685a83d77
+1038	1751	8159239467825315	CMakeFiles/oXs.dir/src/sequencer.cpp.obj	e2f1a655486a6bee
+1012	1756	8159239468011176	CMakeFiles/oXs.dir/src/sdp3x.cpp.obj	ebb2ec754e2ba73f
+1083	1773	8159239468156927	CMakeFiles/oXs.dir/src/sport.cpp.obj	dedc52dd40f2aab9
+1127	1818	8159239468638498	CMakeFiles/oXs.dir/src/sx126x_driver.cpp.obj	1fec69394a10ca5f
+883	1828	8159239468758868	CMakeFiles/oXs.dir/src/sbus_out_pwm.cpp.obj	71bec290a711383c
+1095	1874	8159239469252261	CMakeFiles/oXs.dir/src/srxl2.cpp.obj	c2b7025d7f443abc
+1351	1878	8159239469272375	CMakeFiles/oXs.dir/src/voltage.cpp.obj	daf89d70de268d88
+1423	1915	8159239469636576	CMakeFiles/oXs.dir/src/ws2812.cpp.obj	9094d66c97de457
+1338	1929	8159239469825866	CMakeFiles/oXs.dir/src/vario.cpp.obj	b265da29702908ba
+818	2130	8159239471805291	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
+2130	7217	8159239478635701	FrSky_2_CRSF.elf	c204ed434824413
+34	65	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+86	437	8159241418305654	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+437	5333	8159241421703774	FrSky_2_CRSF.elf	c204ed434824413
+23	49	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+65	446	8159248669122690	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+446	5336	8159248672893026	FrSky_2_CRSF.elf	c204ed434824413
+24	48	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+63	412	8159249982923116	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+413	5261	8159249986843785	FrSky_2_CRSF.elf	c204ed434824413
+22	47	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+62	406	8159254016053924	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+406	5203	8159254019433664	FrSky_2_CRSF.elf	c204ed434824413
+24	48	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+63	412	8159256274485824	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+413	5298	8159256278003572	FrSky_2_CRSF.elf	c204ed434824413
+28	56	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+71	478	8159260823493498	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+478	5405	8159260827235205	FrSky_2_CRSF.elf	c204ed434824413
+23	47	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+19	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+19	50	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+67	438	8159267566119763	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+438	5271	8159267569522239	FrSky_2_CRSF.elf	c204ed434824413
+24	49	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+64	412	8159269072779634	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+412	5275	8159269076509695	FrSky_2_CRSF.elf	c204ed434824413
+22	47	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+65	413	8159270529306959	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+414	5249	8159270532563023	FrSky_2_CRSF.elf	c204ed434824413
+19	40	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+52	327	8159272533135572	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+328	5018	8159272535665597	FrSky_2_CRSF.elf	c204ed434824413
+22	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+14	36	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+49	346	8159279904711998	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+346	5026	8159279907407958	FrSky_2_CRSF.elf	c204ed434824413
+26	52	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+216	1628	8159294921675521	CMakeFiles/oXs.dir/src/ibus_in.cpp.obj	90e5eebe82a770ba
+147	1641	8159294921675521	CMakeFiles/oXs.dir/src/ads1115.cpp.obj	6260cd974d85d83f
+153	1651	8159294921755542	CMakeFiles/oXs.dir/src/crsf_in.cpp.obj	5899a8733b9524ca
+132	1660	8159294921805519	CMakeFiles/oXs.dir/src/MS5611.cpp.obj	5f95ecd40ecb4f65
+178	1670	8159294921775521	CMakeFiles/oXs.dir/src/fbus.cpp.obj	8b47b52b5a4ac70a
+228	1681	8159294921815515	CMakeFiles/oXs.dir/src/inav_ltm.cpp.obj	b6baec0a9fb020d2
+196	1691	8159294921815515	CMakeFiles/oXs.dir/src/gyro.cpp.obj	eb8848223e063dd1
+208	1701	8159294921875510	CMakeFiles/oXs.dir/src/ibus.cpp.obj	ac3534a82770f094
+64	1711	8159294921905541	CMakeFiles/oXs.dir/src/BMP280.cpp.obj	f33840d1f0d358c2
+166	1721	8159294921935567	CMakeFiles/oXs.dir/src/esc.cpp.obj	3486230323d4328
+184	1731	8159294921955516	CMakeFiles/oXs.dir/src/frsky_hub.cpp.obj	86057a49d015a30b
+137	1740	8159294921935567	CMakeFiles/oXs.dir/src/SPL06.cpp.obj	50f7bf62819b27dc
+189	1750	8159294922085665	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+203	1760	8159294921895550	CMakeFiles/oXs.dir/src/hott.cpp.obj	e54ec7255703b6ec
+160	1770	8159294921935567	CMakeFiles/oXs.dir/src/crsf_out.cpp.obj	5a10940ba99e81b2
+142	1780	8159294921945514	CMakeFiles/oXs.dir/src/XGZP6897D.cpp.obj	3c2f4a2c7dc8ce50
+172	1790	8159294922250863	CMakeFiles/oXs.dir/src/exbus.cpp.obj	dd291a4b002e4c7f
+222	1838	8159294922506088	CMakeFiles/oXs.dir/src/inav_frsky.cpp.obj	b649febd5761dd98
+1641	2262	8159294927666856	CMakeFiles/oXs.dir/src/kx134.cpp.obj	3a6d7e23cfdb2d4d
+1691	2273	8159294927396741	CMakeFiles/oXs.dir/src/ms4525.cpp.obj	7ab1eeb9dc252f2b
+1651	2367	8159294928902760	CMakeFiles/oXs.dir/src/logger.cpp.obj	88be8bb6d003641a
+1711	2418	8159294929092895	CMakeFiles/oXs.dir/src/rpm.cpp.obj	4f4bae834006f62f
+1629	2470	8159294929933413	CMakeFiles/oXs.dir/src/jeti.cpp.obj	3a12a6c57fc99d5c
+1681	2476	8159294930073519	CMakeFiles/oXs.dir/src/mpx.cpp.obj	d7e4d9461522cb01
+1721	2489	8159294930073519	CMakeFiles/oXs.dir/src/sbus2_tlm.cpp.obj	cd83238685a83d77
+1750	2607	8159294931016400	CMakeFiles/oXs.dir/src/sdp3x.cpp.obj	ebb2ec754e2ba73f
+1761	2609	8159294931478156	CMakeFiles/oXs.dir/src/sequencer.cpp.obj	e2f1a655486a6bee
+1731	2610	8159294930954183	CMakeFiles/oXs.dir/src/sbus_in.cpp.obj	ae810caa6eb4d6d7
+1790	2619	8159294931508148	CMakeFiles/oXs.dir/src/sx126x_driver.cpp.obj	1fec69394a10ca5f
+1771	2630	8159294931708157	CMakeFiles/oXs.dir/src/sport.cpp.obj	dedc52dd40f2aab9
+1838	2690	8159294932373242	CMakeFiles/oXs.dir/src/vario.cpp.obj	b265da29702908ba
+1780	2691	8159294932373242	CMakeFiles/oXs.dir/src/srxl2.cpp.obj	c2b7025d7f443abc
+1740	2757	8159294933103149	CMakeFiles/oXs.dir/src/sbus_out_pwm.cpp.obj	71bec290a711383c
+2263	2782	8159294933358084	CMakeFiles/oXs.dir/src/voltage.cpp.obj	daf89d70de268d88
+1670	2808	8159294933616238	CMakeFiles/oXs.dir/src/mpu.cpp.obj	d39576630d501c83
+2273	2851	8159294934065357	CMakeFiles/oXs.dir/src/ws2812.cpp.obj	9094d66c97de457
+1660	2955	8159294935096345	CMakeFiles/oXs.dir/src/main.cpp.obj	eb2b09bfa684da96
+1701	3173	8159294937285367	CMakeFiles/oXs.dir/src/param.cpp.obj	430541791951b022
+3173	9118	8159294951725110	FrSky_2_CRSF.elf	c204ed434824413
+19	41	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+55	337	8159361376919972	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+337	5324	8159361382698499	FrSky_2_CRSF.elf	c204ed434824413
+20	41	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+55	346	8159372605280220	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+346	5014	8159372607967589	FrSky_2_CRSF.elf	c204ed434824413
+21	44	0	D:/Ardunio/Inav2Telemetrie/oXs_on_RP2040-main/oXs_on_RP2040-main - SER/build/CMakeFiles/cmake.verify_globs	e83310f70cb4fb11
+57	338	8159420084744039	CMakeFiles/oXs.dir/src/gps.cpp.obj	e6766dd11556f810
+338	5031	8159420087570531	FrSky_2_CRSF.elf	c204ed434824413

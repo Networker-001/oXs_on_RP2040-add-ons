@@ -49,7 +49,7 @@
 
 // SW Version
 
-int SW_Version = 42;
+int SW_Version = 45;
 
 //=====================================================================
 
@@ -626,7 +626,7 @@ void decodeFrSkyCells(int32_t val) {
         // has_mvolt = true;
        
     if ( ! has_mvolt)  setField(fields[MVOLT], total_mvolt);
-        //setField(fields[RESERVE1], total_mvolt);
+    setField(fields[RESERVE1], total_mvolt);
     
     
    // }
@@ -681,7 +681,7 @@ else {
 }
 */
 has_alt_rel = true;
-    setField(fields[RELATIVEALT], val *100 ); // BARO
+    setField(fields[RELATIVEALT], val) ; //); // BARO
    // setField(fields[ALTITUDE], val * 100);  
 
 }
@@ -870,10 +870,10 @@ void decode0x800_o(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
 
 
 // GPS KOORDINATES
-void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
+void decode0x800_oo(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
 
     // 🟢 DOMINANTE VARIABLE: Hier kannst du den Sicherheitsradius (in Metern) jederzeit blitzschnell ändern!
-    static float min_distance_m = 50.0f; // Für große Segler empfohlen: 30.0f bis 50.0f Meter
+    static float min_distance_m = 20.0f; // Für große Segler empfohlen: 30.0f bis 50.0f Meter
 
     extern int32_t live_alt, live_mvolt, live_current, live_speed, live_sat, live_cap, live_pitch, live_roll, live_heading, live_rpm, live_lat, live_lon, live_alt_rel;
     extern bool has_alt, has_alt_rel, has_mvolt, has_current, has_speed, has_sat, has_rpm, has_cap, has_lat, has_lon, has_pitch, has_roll, has_head;
@@ -1057,6 +1057,204 @@ void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
 }
 
 
+void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
+
+    // 🟢 DOMINANTE VARIABLE: Hier kannst du den Sicherheitsradius (in Metern) jederzeit blitzschnell ändern!
+    static float min_distance_m = config.rth_min_Dist;// 60.0f; // Für große Segler empfohlen: 30.0f bis 50.0f Meter
+    static float min_speed = config.rth_min_Speed;// 2.0f; // Minimale geschwindigkeit sollte auf 4 sein
+
+    extern int32_t live_alt, live_mvolt, live_current, live_speed, live_sat, live_cap, live_pitch, live_roll, live_heading, live_rpm, live_lat, live_lon, live_alt_rel;
+    extern bool has_alt, has_alt_rel, has_mvolt, has_current, has_speed, has_sat, has_rpm, has_cap, has_lat, has_lon, has_pitch, has_roll, has_head;
+
+    // 🟢 FIX: Indizes, [6], [7], [8] wieder korrekt hinzugefügt!
+    uint32_t raw_bytes = ((uint32_t)buffer[5])        | 
+                         ((uint32_t)buffer[6] << 8)   | 
+                         ((uint32_t)buffer[7] << 16)  | 
+                         ((uint32_t)buffer[8] << 24);
+
+    // Hilfs-Flags, um zu erkennen, wenn ein neues Paar da ist
+    static bool new_lat_received = false;
+    static bool new_lon_received = false;
+
+    if (val > 0) { 
+        // Positiver Wert -> Breitengrad (Latitude / Nord)
+        uint64_t pure_lat = (uint64_t)(val & 0x3FFFFFFF);
+
+        /*setField(fields[LATITUDE], (int32_t)((pure_lat * 50ULL) / 3ULL));  
+        has_lat = true;
+        new_lat_received = true;    */     
+
+        // 🔄 ÄNDERUNG 1: Den berechneten Wert erst in einer Zwischenvariable speichern
+        int32_t next_lat = (int32_t)((pure_lat * 50ULL) / 3ULL);          
+
+        // 🔄 ÄNDERUNG 2: Plausibilitäts-Bedingung vorschalten
+        if (fields[LATITUDE].value == 0 || abs(next_lat - fields[LATITUDE].value) < 100000) {
+            // Nur wenn das Delta klein genug ist, wird die Queue gefüttert und die Flags gesetzt!
+            setField(fields[LATITUDE], next_lat);          
+            has_lat = true;
+            new_lat_received = true; 
+        }
+        // Wenn der Wert kippt (Delta zu groß), passiert hier einfach gar nichts.
+
+    } 
+    else { 
+        // Negativer Wert -> Längengrad (Longitude / Ost)
+        uint64_t pure_lon = (uint64_t)(raw_bytes & 0x3FFFFFFF);
+
+        //setField(fields[LONGITUDE], (int32_t)((pure_lon * 50ULL) / 3ULL)); 
+        //has_lon = true;
+        //new_lon_received = true; 
+
+        // 🔄 ÄNDERUNG 3: Den berechneten Wert in einer Zwischenvariable speichern
+        int32_t next_lon = (int32_t)((pure_lon * 50ULL) / 3ULL);
+
+        // 🔄 ÄNDERUNG 4: Plausibilitäts-Bedingung vorschalten
+        if (fields[LONGITUDE].value == 0 || abs(next_lon - fields[LONGITUDE].value) < 100000) {
+            setField(fields[LONGITUDE], next_lon); 
+            has_lon = true;
+            new_lon_received = true; 
+        }
+        // Wenn die Longitude kippen sollte, wird sie hier analog abgefangen.
+
+    }
+
+    // Definitionen für Home-Location und Qualitätschallenger
+    static int32_t home_lat = 0;
+    static int32_t home_lon = 0;
+    static uint64_t stable_start_us = 0; 
+    static int32_t min_lat = 2147483647, max_lat = -2147483648;
+    static int32_t min_lon = 2147483647, max_lon = -2147483648;
+    static bool home_is_locked = false; 
+
+    uint64_t current_us = to_us_since_boot(get_absolute_time()); 
+
+    // Weltweiter Plausibilitätscheck
+    bool gps_is_valid = false;
+    if (fields[LATITUDE].value != 0 && fields[LONGITUDE].value != 0 &&
+        fields[LATITUDE].value > -900000000 && fields[LATITUDE].value < 900000000 &&
+        fields[LONGITUDE].value > -1800000000 && fields[LONGITUDE].value < 1800000000) {
+        gps_is_valid = true; 
+    }
+
+    // REINE MATHEMATISCHE QUALITÄTS-PRÜFUNG AM BODEN
+    if (!home_is_locked && gps_is_valid) {
+        if (stable_start_us == 0) {
+            stable_start_us = current_us;
+            min_lat = max_lat = fields[LATITUDE].value;
+            min_lon = max_lon = fields[LONGITUDE].value;
+        }
+
+        if (fields[LATITUDE].value < min_lat)  min_lat = fields[LATITUDE].value;
+        if (fields[LATITUDE].value > max_lat)  max_lat = fields[LATITUDE].value;
+        if (fields[LONGITUDE].value < min_lon) min_lon = fields[LONGITUDE].value;
+        if (fields[LONGITUDE].value > max_lon) max_lon = fields[LONGITUDE].value;
+
+        int32_t current_drift_lat = max_lat - min_lat;
+        int32_t current_drift_lon = max_lon - min_lon;
+
+        if (current_drift_lat <= 300 && current_drift_lon <= 300) {
+            if (current_us - stable_start_us >= 9000000ULL) { 
+                home_lat = min_lat + (current_drift_lat / 2);
+                home_lon = min_lon + (current_drift_lon / 2);
+
+                setField(fields[NUMSAT], 12);
+
+                live_sat = 12; 
+                home_is_locked = true; 
+                has_sat = true;
+            }
+        } 
+        else {
+            stable_start_us = current_us;
+            min_lat = max_lat = fields[LATITUDE].value;
+            min_lon = max_lon = fields[LONGITUDE].value;
+        }
+    }
+
+     // =========================================================================
+    // BERECHNUNG NUR WENN EIN VOLLES NEUES KOORDINATENPAAR DA IST
+    // =========================================================================
+    if (new_lat_received && new_lon_received) {
+        
+        // Flags sofort zurücksetzen für das nächste Paar
+        new_lat_received = false;
+        new_lon_received = false;
+
+        // Statische Variablen für das GPS-Delta (Flugrichtungs-Ermittlung)
+        static int32_t last_lat = 0;
+        static int32_t last_lon = 0;
+
+        float distance_m = 0.0f;
+
+        // 1. Entfernung berechnen (Home Distance)
+        if (home_lat != 0 && home_lon != 0) {
+            float dist_lat = (float)(fields[LATITUDE].value - home_lat) * 0.0111139f;
+            float dist_lon = (float)(fields[LONGITUDE].value - home_lon) * 0.0111139f * 0.6067f; 
+
+            distance_m = sqrtf((dist_lat * dist_lat) + (dist_lon * dist_lon));
+            setField(fields[GPS_HOME_DISTANCE], (int32_t)distance_m);
+            setField(fields[TEMP1], (int32_t)distance_m);
+            
+            fields[NUMSAT].value = 12;
+            live_sat = 12;
+            has_sat = true;
+        }
+
+        // 2. Berechnung des Steuerkurses nach Hause mit starrem Offset
+        if (home_is_locked) {
+            
+            // Ermittle die aktuelle Geschwindigkeit in km/h aus dem Groundspeed (cm/s)
+            float current_speed_kmh = ((float)fields[GROUNDSPEED].value * 36.0f) / 1000.0f;
+
+            // Rauschfilter & Sicherheitsradius: Nur steuern, wenn das Modell weit genug weg UND in Bewegung ist
+            if (distance_m > min_distance_m && current_speed_kmh > min_speed && last_lat != 0 && last_lon != 0) {
+                
+                // A) Richtung vom Startpunkt zum Modell berechnen
+                float dLat_calc = (float)(fields[LATITUDE].value - home_lat);
+                float dLon_calc = (float)(fields[LONGITUDE].value - home_lon) * 0.6067f;
+                float heading_deg = atan2f(dLon_calc, dLat_calc) * 57.29578f;           
+                
+                // Soll-Kurs: Absolute Himmelsrichtung von der aktuellen Position ZURÜCK zu Home (0 bis 360°)
+                float bearing_to_home = heading_deg + 180.0f;
+                if (bearing_to_home >= 360.0f) bearing_to_home -= 360.0f;
+
+                // B) Echten Ist-Kurs (aktuelle Flugrichtung) über das GPS-Delta berechnen
+                float move_lat = (float)(fields[LATITUDE].value - last_lat) * 0.0111139f;
+                float move_lon = (float)(fields[LONGITUDE].value - last_lon) * 0.0111139f * 0.6067f;
+                float track_deg = atan2f(move_lon, move_lat) * 57.29578f;
+                if (track_deg < 0.0f) track_deg += 360.0f; // Auf 0-360° normieren
+
+                // C) Reinen Steuerwinkel ermitteln (-180° bis +180°)
+                float turn_angle = bearing_to_home - track_deg;
+                if (turn_angle > 180.0f)  turn_angle -= 360.0f;
+                if (turn_angle < -180.0f) turn_angle += 360.0f;
+
+                // D) Für den EdgeTX-Geber: Steuerwinkel von (-180 bis +180) auf (0 bis 100) stauchen
+                // Wir teilen durch 3.6f, um den Winkel auf -50 bis +50 zu bringen.
+                // Dann addieren wir starr +50.0f Offset, damit der Wert perfekt zwischen 0 und 100 landet.
+                float telemetry_value = ((turn_angle / 3.6f) + 50.0f) *100;
+                //float telemetry_value = (turn_angle ) + 180.0f;
+                // Wert an das Telemetrie-Feld übergeben (Ersetze GPS_HEADING durch dein echtes Zielfeld)
+                setField(fields[HEADING], (int32_t)telemetry_value);
+            }
+            else {
+               // Ruhelage/Nahbereich: Sende exakt 50 (ergibt 0% im Geber)
+               setField(fields[HEADING], 5000);
+            }
+
+            // Aktuelle Koordinaten als "alte Koordinaten" für den nächsten Durchlauf merken
+            last_lat = fields[LATITUDE].value;
+            last_lon = fields[LONGITUDE].value;
+        }
+    } else {
+        setField(fields[HEADING], 5000);
+
+    }
+
+}
+
+
+
 
 /*void decode0x820(int32_t val) { // GPS Höhe
     extern int32_t live_alt;
@@ -1100,7 +1298,7 @@ void decode0x820(int32_t val) { // GPS Höhe
 
     setField(fields[ALTITUDE], val );  // GPS
  
-      
+    return;  
 
     if  ( has_alt_rel  || has_alt_uni ){  return; }
     
@@ -1236,6 +1434,8 @@ void decode0x880(int32_t val) {// 🏔️ FrSky Vario: Absolute Höhe -> in rela
     has_alt_uni = true;
 }
 
+
+
 void handleMultiProtocol_N(uint8_t b) {
     // 1. Alle externen globalen Variablen sauber anmelden
     extern int32_t live_alt, live_mvolt, live_current, live_speed, live_sat, live_cap, live_pitch, live_roll, live_heading, live_rpm, live_lat, live_lon, live_alt_rel;
@@ -1323,7 +1523,7 @@ void handleMultiProtocol_N(uint8_t b) {
                             //case 0x0880:              decode0x880(val)                                           ; break; // UNI Höhe
  
                          }
-                         setField(fields[TEMP1], aktiverIndex );      // Unisens-E Index
+                         //setField(fields[TEMP1], aktiverIndex );      // Unisens-E Index
                          setField(fields[TEMP2],  SW_Version  );        // SW-Version
                          fields[MVOLT].available = true;
 
@@ -1350,18 +1550,14 @@ void handleMultiProtocol_N(uint8_t b) {
                 }
                 state = HUNT;                                          
             }
-            // Das Dauerfeuer für onceAvailable (wird immer beim Auslauf gezündet)
-            /*fields[ALTITUDE].onceAvailable = fields[MVOLT].onceAvailable = fields[CURRENT].onceAvailable = true;
-            fields[GROUNDSPEED].onceAvailable = fields[NUMSAT].onceAvailable = fields[RPM].onceAvailable = true;
-            fields[PITCH].onceAvailable = fields[ROLL].onceAvailable = fields[HEADING].onceAvailable = true;
-            fields[CAPACITY].onceAvailable = fields[TEMP1].onceAvailable = fields[TEMP2].onceAvailable = true;
-            fields[RELATIVEALT].onceAvailable = fields[RESERVE2].onceAvailable = fields[VSPEED].onceAvailable = true;
-            fields[LATITUDE].onceAvailable = fields[LONGITUDE].onceAvailable = true;*/
            
 
             break;
     }
 }
+
+
+
 
 void init_frsky_sensors_core1(void) {
     
@@ -1409,10 +1605,20 @@ void read_frsky_sensors_core1(void) {
                 }
                 break; 
             case 2: 
-                if (active_sensors_count > 0 && active_sensors[0] == 0x1B) {
-                    current_polling_id = 0x1B; 
+                // 🚀 WECHSELTAKTIERUNG FÜR S.PORT GPS (ID 0x03)
+                static bool toggle_gps_slot = false;
+                
+                if (toggle_gps_slot) {
+                    current_polling_id = 0x03; // 🛰️ Festes Polling für das FrSky GPS!
+                    toggle_gps_slot = false;
                 } else {
-                    current_polling_id = 0x00; 
+                    // Originaler Klasse-A-Takt (Vario / iNav FC)
+                    if (active_sensors_count > 0 && active_sensors[0] == 0x1B) {
+                        current_polling_id = 0x1B; 
+                    } else {
+                        current_polling_id = 0x00; 
+                    }
+                    toggle_gps_slot = true;
                 }
                 break; 
             case 3: 
@@ -1530,160 +1736,9 @@ typedef struct {
     int8_t  direction; // Individuelle Richtung (+1 oder -1)
 } SimConfig;
 
-
-void simulate_all_sensors_flexible_new() {
-    static uint32_t last_calc_time = 0;
-    static uint32_t last_send_time = 0;
-    static int send_state = 0; // Steuert, welcher Wert als nächstes versetzt gesendet wird
-    
-    uint32_t now = to_ms_since_boot(get_absolute_time());
-
-    // 🟢 FLEXIBLE EINSTELLUNGEN PRO WERT [Startwert, Min, Max, Schrittweite, Richtung]
-    static SimConfig cfg_alt         = {0,     -2000, 30000, 200, 1}; // ALTITUDE (in cm)
-    static SimConfig cfg_vspeed      = {0,     -1000,  1000,  20, 1}; // VSPEED (in cm/s)
-    static SimConfig cfg_current     = {15000,     0, 60000, 500, 1}; // CURRENT (in mA)
-    static SimConfig cfg_capacity    = {0,         0,  5000,  10, 1}; // CAPACITY (in mAh)
-    static SimConfig cfg_cell        = {4200,   3300,  4200,   5,-1}; // Einzelzellen (in mV)
-    static SimConfig cfg_rpm         = {1200,   1000,  3000,  50, 1}; // RPM (in Hz/Umin)
-    static SimConfig cfg_groundspeed = {0,         0,  3000,  40, 1}; // GROUNDSPEED (in cm/s)
-    static SimConfig cfg_gps_alt     = {0,     -2000, 30000, 200, 1}; // GPS-Höhe (in cm)
-    static SimConfig cfg_heading     = {18000,     0, 35900, 200, 1}; // HEADING (in 1/100 Grad)
-
-    // --- 1. SCHLEIFE: BERECHNUNG DER WERTE (Alle 300 ms) ---
-    if (now - last_calc_time >= 300) { 
-        last_calc_time = now;
-
-        #define UPDATE_SIM(cfg) do { \
-            (cfg).current += ((cfg).step * (cfg).direction); \
-            if ((cfg).current > (cfg).max || (cfg).current < (cfg).min) { \
-                (cfg).direction = -(cfg).direction; \
-                if ((cfg).current > (cfg).max) (cfg).current = (cfg).max; \
-                if ((cfg).current < (cfg).min) (cfg).current = (cfg).min; \
-            } \
-        } while(0)
-
-        UPDATE_SIM(cfg_alt);
-        UPDATE_SIM(cfg_vspeed);
-        UPDATE_SIM(cfg_current);
-        UPDATE_SIM(cfg_capacity);
-        UPDATE_SIM(cfg_cell);
-        UPDATE_SIM(cfg_rpm);
-        UPDATE_SIM(cfg_groundspeed);
-        UPDATE_SIM(cfg_gps_alt);
-        UPDATE_SIM(cfg_heading);
-    }
-
-    // --- 2. ÜBERGABE AN DAS VALIDIERTE OXS FIELDS-ARRAY MIT ZEITLICHEM VERSATZ ---
-    // Alle 5 ms wird exakt ein Datenblock an Core 0 übergeben, um die Buslast zu verteilen
-    if (now - last_send_time >= 5) {
-        last_send_time = now;
-
-        switch (send_state) {
-            case 0:
-                // Höhenwerte (Vario)
-                //setField(fields[ALTITUDE], cfg_alt.current);
-                //setField(fields[RELATIVEALT], cfg_alt.current);
-                setField(fields[VSPEED], cfg_vspeed.current);
-                send_state++;
-                break;
-
-            case 1:
-                // Strom & Kapazität
-                //setField(fields[CURRENT], cfg_current.current);
-                setField(fields[CAPACITY], cfg_capacity.current);
-                send_state++;
-                break;
-
-            case 2:
-                /*
-                // 🟢 Einzelzellen exakt berechnen (inklusive Drift)
-                int32_t c1 = cfg_cell.current;
-                int32_t c2 = cfg_cell.current - 15;
-                int32_t c3 = cfg_cell.current + 5;
-                int32_t c4 = cfg_cell.current - 10;
-                int32_t c5 = cfg_cell.current;
-                int32_t c6 = cfg_cell.current - 5;
-                int32_t c7 = cfg_cell.current + 10;
-                int32_t c8 = cfg_cell.current - 20;
-
-                // Werte in die ADS-Felder schreiben
-                setField(fields[ADS_1_1], c1);
-                setField(fields[ADS_1_2], c2);
-                setField(fields[ADS_1_3], c3);
-                setField(fields[ADS_1_4], c4);
-                setField(fields[ADS_2_1], c5);
-                setField(fields[ADS_2_2], c6);
-                //setField(fields[ADS_2_3], c7);
-                //setField(fields[ADS_2_4], c8);
-
-                // 🟢 Die echte mathematische Summe für MVOLT bilden
-                int32_t total_mvolt = c1 + c2 + c3 + c4 + c5 + c6 ;//+ c7 + c8;
-
-                setField(fields[MVOLT], total_mvolt);
-                setField(fields[RESERVE1], total_mvolt);
-                */
-                send_state++;
-                break;
-
-            case 3:
-                // Drehzahl
-                setField(fields[RPM], cfg_rpm.current);
-                send_state++;
-                break;
-
-            case 4:
-                // GPS-Daten
-                setField(fields[GROUNDSPEED], cfg_groundspeed.current);
-                send_state++;
-                break;
-
-            case 5:
-                setField(fields[HEADING], cfg_heading.current);
-                send_state++;
-                break;
-
-            case 6:
-                setField(fields[LATITUDE], 52638400);  // 52.638400° N
-                send_state++;
-                break;
-
-            case 7:
-                setField(fields[LONGITUDE], 9983100);  // 9.983100° E
-                send_state++;
-                break;
-
-            case 8:
-                // GPS-Höhe auf RESERVE2 abgelegt
-                // setField(fields[RESERVE2], cfg_gps_alt.current);
-                
-                // Satellitenanzahl
-                {
-                    uint8_t sim_sats = (cfg_alt.direction > 0) ? 12 : 8;
-                    setField(fields[NUMSAT], sim_sats);
-                }
-                send_state = 0; // Wieder von vorne beginnen
-                break;
-
-            default:
-                send_state = 0;
-                break;
-        }
-    }
-
-    // --- 3. HARDWARE-BLINKTAKTSYNC ---
-    if ((now / 150) % 2 == 0) { setRgbColorOn(0, 1, 0); } else { setRgbColorOn(0, 0, 0); }
-    
-    // Ausgabe seltener machen, um den seriellen Puffer nicht zu überlasten
-    static uint32_t last_print = 0;
-    if (now - last_print >= 500) {
-        last_print = now;
-        printAllTelemetryValues();
-    }
-}
+void simulate_frsky_sensors_core1()  {
 
 
-
-void simulate_all_sensors_flexible() {
     static uint32_t last_poll_time = 0;
     uint32_t now = to_ms_since_boot(get_absolute_time());
 
@@ -1798,10 +1853,9 @@ void simulate_all_sensors_flexible() {
 
 
 
-void simulate_frsky_sensors_core1() {
+void simulate_frsky_sensors_core1_a() {
     
-     simulate_all_sensors_flexible();
-    return;
+
     // 🟢 SYSTEMATISCH GETRENNT: Vario (0x1B), Spannung/Strom (0x03), Zellenpaare (0x41..0x44) und GPS (0x22)
     static const uint8_t physical_ids[] = {0x1B, 0x03, 0x41, 0x42, 0x43, 0x44, 0x22}; 
     static uint8_t current_id_idx = 0;
@@ -1967,9 +2021,6 @@ void simulate_frsky_sensors_core1() {
     }
     
 }
-
-
-
 
 void simulate_frsky_sensors_core1_f() {
     // 🟢 SYSTEMATISCH GETRENNT: oXs-Erweiterung (0x77) hinten angehängt, Rest unberührt!
@@ -2162,4 +2213,185 @@ void simulate_frsky_sensors_core1_f() {
             if (now - last_sim_toggle >= 150) { last_sim_toggle = now; led_state = !led_state; }
         }
     }
+}
+
+void simulate_all_sensors_flexible_new() {
+    static uint32_t last_calc_time = 0;
+    static uint32_t last_send_time = 0;
+    static int send_state = 0; // Steuert, welcher Wert als nächstes versetzt gesendet wird
+    
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+
+    // 🟢 FLEXIBLE EINSTELLUNGEN PRO WERT [Startwert, Min, Max, Schrittweite, Richtung]
+    static SimConfig cfg_alt         = {0,     -2000, 30000, 200, 1}; // ALTITUDE (in cm)
+    static SimConfig cfg_vspeed      = {0,     -1000,  1000,  20, 1}; // VSPEED (in cm/s)
+    static SimConfig cfg_current     = {15000,     0, 60000, 500, 1}; // CURRENT (in mA)
+    static SimConfig cfg_capacity    = {0,         0,  5000,  10, 1}; // CAPACITY (in mAh)
+    static SimConfig cfg_cell        = {4200,   3300,  4200,   5,-1}; // Einzelzellen (in mV)
+    static SimConfig cfg_rpm         = {1200,   1000,  3000,  50, 1}; // RPM (in Hz/Umin)
+    static SimConfig cfg_groundspeed = {0,         0,  3000,  40, 1}; // GROUNDSPEED (in cm/s)
+    static SimConfig cfg_gps_alt     = {0,     -2000, 30000, 200, 1}; // GPS-Höhe (in cm)
+    static SimConfig cfg_heading     = {18000,     0, 35900, 200, 1}; // HEADING (in 1/100 Grad)
+
+    // --- 1. SCHLEIFE: BERECHNUNG DER WERTE (Alle 300 ms) ---
+    if (now - last_calc_time >= 300) { 
+        last_calc_time = now;
+
+        #define UPDATE_SIM(cfg) do { \
+            (cfg).current += ((cfg).step * (cfg).direction); \
+            if ((cfg).current > (cfg).max || (cfg).current < (cfg).min) { \
+                (cfg).direction = -(cfg).direction; \
+                if ((cfg).current > (cfg).max) (cfg).current = (cfg).max; \
+                if ((cfg).current < (cfg).min) (cfg).current = (cfg).min; \
+            } \
+        } while(0)
+
+        UPDATE_SIM(cfg_alt);
+        UPDATE_SIM(cfg_vspeed);
+        UPDATE_SIM(cfg_current);
+        UPDATE_SIM(cfg_capacity);
+        UPDATE_SIM(cfg_cell);
+        UPDATE_SIM(cfg_rpm);
+        UPDATE_SIM(cfg_groundspeed);
+        UPDATE_SIM(cfg_gps_alt);
+        UPDATE_SIM(cfg_heading);
+    }
+
+    // --- 2. ÜBERGABE AN DAS VALIDIERTE OXS FIELDS-ARRAY MIT ZEITLICHEM VERSATZ ---
+    // Alle 5 ms wird exakt ein Datenblock an Core 0 übergeben, um die Buslast zu verteilen
+    if (now - last_send_time >= 5) {
+        last_send_time = now;
+
+        switch (send_state) {
+            case 0:
+                // Höhenwerte (Vario)
+                //setField(fields[ALTITUDE], cfg_alt.current);
+                //setField(fields[RELATIVEALT], cfg_alt.current);
+                setField(fields[VSPEED], cfg_vspeed.current);
+                send_state++;
+                break;
+
+            case 1:
+                // Strom & Kapazität
+                //setField(fields[CURRENT], cfg_current.current);
+                setField(fields[CAPACITY], cfg_capacity.current);
+                send_state++;
+                break;
+
+            case 2:
+                /*
+                // 🟢 Einzelzellen exakt berechnen (inklusive Drift)
+                int32_t c1 = cfg_cell.current;
+                int32_t c2 = cfg_cell.current - 15;
+                int32_t c3 = cfg_cell.current + 5;
+                int32_t c4 = cfg_cell.current - 10;
+                int32_t c5 = cfg_cell.current;
+                int32_t c6 = cfg_cell.current - 5;
+                int32_t c7 = cfg_cell.current + 10;
+                int32_t c8 = cfg_cell.current - 20;
+
+                // Werte in die ADS-Felder schreiben
+                setField(fields[ADS_1_1], c1);
+                setField(fields[ADS_1_2], c2);
+                setField(fields[ADS_1_3], c3);
+                setField(fields[ADS_1_4], c4);
+                setField(fields[ADS_2_1], c5);
+                setField(fields[ADS_2_2], c6);
+                //setField(fields[ADS_2_3], c7);
+                //setField(fields[ADS_2_4], c8);
+
+                // 🟢 Die echte mathematische Summe für MVOLT bilden
+                int32_t total_mvolt = c1 + c2 + c3 + c4 + c5 + c6 ;//+ c7 + c8;
+
+                setField(fields[MVOLT], total_mvolt);
+                setField(fields[RESERVE1], total_mvolt);
+                */
+                send_state++;
+                break;
+
+            case 3:
+                // Drehzahl
+                setField(fields[RPM], cfg_rpm.current);
+                send_state++;
+                break;
+
+            case 4:
+                // GPS-Daten
+                setField(fields[GROUNDSPEED], cfg_groundspeed.current);
+                send_state++;
+                break;
+
+            case 5:
+                setField(fields[HEADING], cfg_heading.current);
+                send_state++;
+                break;
+
+            case 6:
+                setField(fields[LATITUDE], 52638400);  // 52.638400° N
+                send_state++;
+                break;
+
+            case 7:
+                setField(fields[LONGITUDE], 9983100);  // 9.983100° E
+                send_state++;
+                break;
+
+            case 8:
+                // GPS-Höhe auf RESERVE2 abgelegt
+                // setField(fields[RESERVE2], cfg_gps_alt.current);
+                
+                // Satellitenanzahl
+                {
+                    uint8_t sim_sats = (cfg_alt.direction > 0) ? 12 : 8;
+                    setField(fields[NUMSAT], sim_sats);
+                }
+                send_state = 0; // Wieder von vorne beginnen
+                break;
+
+            default:
+                send_state = 0;
+                break;
+        }
+    }
+
+    // --- 3. HARDWARE-BLINKTAKTSYNC ---
+    if ((now / 150) % 2 == 0) { setRgbColorOn(0, 1, 0); } else { setRgbColorOn(0, 0, 0); }
+    
+    // Ausgabe seltener machen, um den seriellen Puffer nicht zu überlasten
+    static uint32_t last_print = 0;
+    if (now - last_print >= 500) {
+        last_print = now;
+        printAllTelemetryValues();
+    }
+}
+
+
+
+
+void test_gps_escaped_packet(void) {
+    printf("\n--- STARTE S.PORT ESCAPE-PARSER TEST ---\n");
+
+    // Der simulierte Bytestrom inklusive des gestopften 0x7D 0x5E Paars
+    uint8_t test_stream[] = {
+        0x7E,       // Start-Byte
+        0x10,       // Frame Header (wird von deiner Lese-Funktion injiziert)
+        0x03,       // Sensor-ID (GPS)
+        0x00,       // Data ID Low (0x0800)
+        0x08,       // Data ID High (0x0800)
+        0x34,       // Value Byte 1 (Low)
+        0x7D, 0x5E, // Das gestopfte Byte! Repräsentiert eigentlich 0x7E
+        0x12,       // Value Byte 3
+        0x00,       // Value Byte 4 (High) -> Gesamtwert ungestopft: 0x00127E34
+        0x20        // CRC (berechnet auf Basis von 0xDF)
+    };
+
+    size_t stream_length = sizeof(test_stream) / sizeof(test_stream[0]);
+
+    printf("Sende %d Bytes an handleMultiProtocol_N...\n", (int)stream_length);
+
+    for (size_t i = 0; i < stream_length; i++) {
+        handleMultiProtocol_N(test_stream[i]);
+    }
+
+    printf("--- TEST ABGESCHLOSSEN ---\n\n");
 }

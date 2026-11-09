@@ -14,6 +14,7 @@
 #include <inttypes.h> // used by PRIu32
 #include "mpx.h"
 #include "config.h"
+#include "lps22hb.h"
 
 // one pio and 2 state machines are used to manage the mpx in halfduplex
 // one state machine (sm) handle the TX and the second the RX
@@ -209,6 +210,7 @@ extern field fields[];  // list of all telemetry fields and parameters used by o
 extern MS5611 baro1;
 extern SPL06 baro2;
 extern BMP280 baro3;
+extern LPS22HB baro4;
 
 extern GPS gps;
 extern CONFIG config;

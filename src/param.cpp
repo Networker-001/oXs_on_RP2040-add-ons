@@ -35,6 +35,7 @@
 #include "kx134.h"
 #include "sx126x_driver.h"
 #include "rfm95.h"
+#include "lps22hb.h"
 
 // commands could be in following form:
 // C1 = 0/15  ... C16 = 0/15
@@ -102,6 +103,7 @@ extern field fields[];  // list of all telemetry fields and parameters used by S
 extern MS5611 baro1 ;
 extern SPL06  baro2 ;
 extern BMP280 baro3 ; 
+extern LPS22HB baro4;
 
 extern MS4525 ms4525;
 extern SDP3X  sdp3x;
@@ -1506,6 +1508,35 @@ int8_t handleOneCmd( char * bufferPos){ // handle one command with buffer starti
         }
     }    
 
+    // 🟢 NEU: Auswertung für die minimale RTH Home Distance
+    if (( strcmp("RTD", pkey) == 0 ) ||( strcmp("CP", pkey) == 0 )){ 
+        ui = strtoul(pvalue, &ptr, 10);
+        if ( *ptr != 0x0 ){
+            printf("Error : rth_min_Dist setting must be an integer\n");
+        } else if ( !(ui >= 2 && ui <= 255) ) {
+            // Krisensichere Bereichsprüfung: Erlaubt sind starr nur die GPIOs 2, 3 und 4
+            printf("Error : rth_min_Dist setting must be between 2 and 255\n");
+        } else {    
+            config.rth_min_Dist = (uint8_t) ui;
+            printf("Return to home min Distance = %u\n", config.rth_min_Dist);
+            return 2;
+        }
+    }  
+
+    // 🟢 NEU: Auswertung für die minimale RTH Speed
+    if (( strcmp("RTS", pkey) == 0 ) ||( strcmp("CP", pkey) == 0 )){ 
+        ui = strtoul(pvalue, &ptr, 10);
+        if ( *ptr != 0x0 ){
+            printf("Error : rth_min_Speed setting must be an integer\n");
+        } else if ( !(ui >= 0 && ui <= 255) ) {
+            // Krisensichere Bereichsprüfung: Erlaubt sind starr nur die GPIOs 2, 3 und 4
+            printf("Error : rth_min_Speed setting must be between 0 and 255\n");
+        } else {    
+            config.rth_min_Speed = (uint8_t) ui;
+            printf("Return to home min Speed = %u\n", config.rth_min_Speed);
+            return 2;
+        }
+    }  
 
 
     // Eigener Diagnose-Befehl zur Speicheranalyse
@@ -1905,6 +1936,12 @@ void printConfigAndSequencers(){   // print all and perform checks
         printf("4 (CONV_PIN on GPIO 4)\n")  ;
     }
    
+    printf("Return to home min Dist . =  %u ", config.rth_min_Dist);
+    printf("(RTD = 2 .. 255)\n");
+
+    printf("Return to home min Speed  =  %u ", config.rth_min_Speed);
+    printf(" (RTS = 0 .. 255)\n");
+
     // =================================================================    
     printf("CRSF baudrate . . . . .   =  %" PRIu32 "\n", config.crsfBaudrate)  ;
     printf("Logger baudrate . . . . . =  %" PRIu32 "\n", config.loggerBaudrate)  ;
@@ -1933,6 +1970,10 @@ void printConfigAndSequencers(){   // print all and perform checks
         printf("Baro sensor is detected using BMP280 at I2c adress %x\n", baro3._address)  ;
         printf("    Sensitivity min = %i (at %i)   , max = %i (at %i)\n", SENSITIVITY_MIN, SENSITIVITY_MIN_AT, SENSITIVITY_MAX, SENSITIVITY_MAX_AT);
         printf("    Hysteresis = %i \n", VARIOHYSTERESIS);        
+    } else if (baro4.baroInstalled) {
+        printf("Baro sensor is detected using LPS22HB at I2c adress %x\n", baro4._address)  ;
+        printf("    Sensitivity min = %i (at %i)   , max = %i (at %i)\n", SENSITIVITY_MIN, SENSITIVITY_MIN_AT, SENSITIVITY_MAX, SENSITIVITY_MAX_AT);
+        printf("    Hysteresis = %i \n", VARIOHYSTERESIS);      
     } else {
         printf("Baro sensor is not detected\n")  ;
     }
@@ -2318,6 +2359,8 @@ void setupConfig(){   // The config is uploaded at power on
         config.pinLow = _pinLow;
         config.inav_ltm = _inav_ltm;        
         config.inav_ltm_pin = 2;             
+        config.rth_min_Dist = _rth_min_Dist;
+        config.rth_min_Speed = _rth_min_Speed;
     }     
 
 } 

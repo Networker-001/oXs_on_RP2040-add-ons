@@ -59,6 +59,7 @@ typedef enum
     CRSF_FRAMEIDX_BARO_ALTITUDE = 0x04,
     CRSF_FRAMEIDX_FLIGHT_MODE = 0x05,
     CRSF_FRAMEIDX_VOLTAGES = 0x06, // NEU: Index 6 für den 0x0E Zellenframe reservieren
+    CRSF_FRAMEIDX_TEMP = 0x07,
 } crsf_frame_idx_e;
 
 typedef enum

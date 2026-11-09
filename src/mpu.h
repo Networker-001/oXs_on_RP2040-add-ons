@@ -27,7 +27,7 @@ public:
     void testDevicesOffsetX();
     void printOffsets();
     bool calibrateAccelGyro(void);
-
+    bool isMpu9250 = false; // Wird true, wenn dein Waveshare-Board erkannt wird
 
 
 

@@ -239,7 +239,15 @@ public:
     bool GPS_fix = false ; // true if gps data are available.
     bool new_position = false ;
     bool new_speed = false ;
-      
+
+    int32_t GPS_custom_steering = 5000; // 🚀 Lenkbefehl für die FrSky-Telemetrie
+    uint64_t stable_start_us = 0;       // 🔒 Startzeit für den Home-Lock
+    bool home_is_locked = false;        // 🔒 Status des Home-Locks
+    uint8_t GPS_home_lock_sats = 0; // 🛰️ Speichert die echten Satelliten für den Home-Lock
+    int32_t GPS_live_speed_cms = 0; // 🚗 Speichert die echte 3D-Geschwindigkeit für die RTH-Sperre
+
+
+
 
     explicit GPS(void);
     
