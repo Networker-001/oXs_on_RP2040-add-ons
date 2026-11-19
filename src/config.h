@@ -302,8 +302,8 @@
  #define _pinChannels_14  0XFF
  #define _pinChannels_15  0XFF
  #define _pinChannels_16  0XFF
- #define _pinGpsTx  0XFF
- #define _pinGpsRx  0XFF
+ //#define _pinGpsTx  0XFF
+ //#define _pinGpsRx  0XFF
  //#define _pinPrimIn  0XFF
  #define _pinSecIn  0XFF 
  #define _pinSbusOut  0XFF
@@ -362,14 +362,15 @@
 #define _pinHigh 255;   // force a level High on this pin (when defined between 0 and 29)
 #define _pinLow 255;   // force a level Low on this pin (when defined between 0 and 29)
 #define _rth_min_Dist 60;
-#define _rth_min_Speed 2;
+#define _rth_min_Speed 12;
+#define _rth_orbit true  // true = orbit, false = direct to home
 
 // =================================================================
 // ZENTRALE AUSWAHL: Hier das gewünschte Protokoll eintragen (1, 2, 3 oder 4)
 // =================================================================
 
 
-#define PROTO_SELECT  5
+#define PROTO_SELECT  10
 
 
 // 1 = ltm to Jeti EX Protocoll
@@ -379,57 +380,84 @@
 
 // =================================================================
 
-#if (PROTO_SELECT == 1)
-    // ltm to Jeti EX Protocoll
-    #define _pinPrimIn  0X09
-    #define _pinTlm     0XFF
-    #define _inav_ltm   1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
-    #define _protocol   'E'           // E = Jeti EX
+// Äußere Abfrage: Bereich 1 bis 7
+#if (PROTO_SELECT >= 1) && (PROTO_SELECT <= 7)
 
-#elif (PROTO_SELECT == 2)
-    // ltm to Multiplex Protocoll
-    #define _pinPrimIn  0XFF
-    #define _pinTlm     0X00
-    #define _inav_ltm   1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
-    #define _protocol   'M'           // M = Multiplex
+    // Standardwerte für Gruppe 1 bis 7 (z. B. gemeinsame Sensoren/Pins)
+    #define _pinGpsTx  0XFF
+    #define _pinGpsRx  0XFF
 
-#elif (PROTO_SELECT == 3)
-    // ltm to Hott Protocoll
-    #define _pinPrimIn  0XFF
-    #define _pinTlm     0X00
-    #define _inav_ltm   1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
-    #define _protocol   'H'           // H = Hott
+    // Deine bestehende Einzelauswahl (innere Verschachtelung)
+    #if (PROTO_SELECT == 1)
+        // ltm to Jeti EX Protocoll
+        #define _pinPrimIn  0X09
+        #define _pinTlm     0XFF
+        #define _inav_ltm   1             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
+        #define _protocol   'E'           // E = Jeti EX
 
-#elif (PROTO_SELECT == 4)
-    // frsky to Hott Protocoll
-    #define _pinPrimIn  0XFF
-    #define _pinTlm     0X00
-    #define _inav_ltm   3             // 3 = FRSKY Protokoll, 2 = Testausgabe...
-    #define _protocol   'H'           // H = Hott
+    #elif (PROTO_SELECT == 2)
+        // ltm to Multiplex Protocoll
+        #define _pinPrimIn  0XFF
+        #define _pinTlm     0X00
+        #define _inav_ltm   1
+        #define _protocol   'M'
 
-#elif (PROTO_SELECT == 5)
-    // frsky to csrf Protocoll
-    #define _pinPrimIn  0XFF
-    #define _pinTlm     0X00
-    #define _inav_ltm   3             // 3 = FRSKY Protokoll, 2 = Testausgabe...
-    #define _protocol   'C'           // C = csrf
+    #elif (PROTO_SELECT == 3)
+        // ltm to Hott Protocoll
+        #define _pinPrimIn  0XFF
+        #define _pinTlm     0X00
+        #define _inav_ltm   1
+        #define _protocol   'H'
 
-#elif (PROTO_SELECT == 6)
-    // frsky to Multiplex Protocoll
-    #define _pinPrimIn  0XFF
-    #define _pinTlm     0X00
-    #define _inav_ltm   3             // 3 = FRSKY Protokoll, 2 = Testausgabe...
-    #define _protocol   'M'           // M = Multiplex
-    
-#elif (PROTO_SELECT == 7)
-    // ltm to Jeti EX Protocoll
-    #define _pinPrimIn  0X09
-    #define _pinTlm     0XFF
-    #define _inav_ltm   3             // 1 = INAV LTM Protokoll, 0 = Standardsensoren
-    #define _protocol   'E'           // E = Jeti EX    
+    #elif (PROTO_SELECT == 4)
+        // frsky to Hott Protocoll
+        #define _pinPrimIn  0XFF
+        #define _pinTlm     0X00
+        #define _inav_ltm   3
+        #define _protocol   'H'
 
+    #elif (PROTO_SELECT == 5)
+        // frsky to csrf Protocoll
+        #define _pinPrimIn  0XFF
+        #define _pinTlm     0X00
+        #define _inav_ltm   3
+        #define _protocol   'C'
+
+    #elif (PROTO_SELECT == 6)
+        // frsky to Multiplex Protocoll
+        #define _pinPrimIn  0XFF
+        #define _pinTlm     0X00
+        #define _inav_ltm   3
+        #define _protocol   'M'
+
+    #elif (PROTO_SELECT == 7)
+        // frsky to Jeti EX Protocoll
+        #define _pinPrimIn  0X09
+        #define _pinTlm     0XFF
+        #define _inav_ltm   3
+        #define _protocol   'E'
+    #endif
+
+// Äußere Abfrage: Bereich ab 8 (z. B. 8 bis 10)
+#elif (PROTO_SELECT >= 10) && (PROTO_SELECT <= 20)
+
+    // Andere Standardwerte für die Gruppe ab 10 (z. B. gemeinsame Sensoren/Pins)
+     #define _pinGpsTx  0X1D
+     #define _pinGpsRx  0X1C
+
+    #if (PROTO_SELECT == 10)
+        // Protokoll 10 Einstellungen
+        #define _pinPrimIn  0XFF
+        #define _pinTlm     0X00
+        #define _inav_ltm   0XFF
+        #define _protocol   'C'
+    #elif (PROTO_SELECT == 11)
+        // Protokoll 11 Einstellungen...
+    #endif
+
+// Fehlerbehandlung, falls eine ungültige Zahl (z. B. 0 oder 99) eingetragen wurde
 #else
-    #error "Ungültige Auswahl für PROTO_SELECT! Bitte eine Zahl von 1 bis 4 wählen."
+    #error "Ungültige Auswahl für PROTO_SELECT!"
 #endif
 
 // FRSKY S.PORT MASTER INPUT CONFIGURATION

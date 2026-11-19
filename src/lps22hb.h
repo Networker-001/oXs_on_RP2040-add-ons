@@ -15,7 +15,7 @@
 class LPS22HB {
 public:
     LPS22HB();
-    bool begin();
+    void begin();
     int getAltitude(); 
     bool baroInstalled = false;
     int32_t altitudeCm;         // Das braucht deine main.cpp!
@@ -24,6 +24,7 @@ public:
     uint8_t _address = 0x5C;
 
 private:
+    void tryAddress(uint8_t address);
     bool writeRegister(uint8_t reg, uint8_t value);
     bool readRegisters(uint8_t reg, uint8_t *buffer, uint8_t length);
     

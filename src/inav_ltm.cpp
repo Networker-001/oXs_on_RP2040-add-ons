@@ -58,6 +58,7 @@ extern VARIO vario1;
 
 extern field fields[];
 
+
 extern bool ltm_data_rx_flag;
 
 // Initialisiert die UART-Schnittstelle fuer den nativen iNav LTM-Empfang (Normal/Nicht-Invertiert!)
@@ -71,13 +72,24 @@ void init_inav_ltm() {
 }
 
 // Das neue Makro nutzt den Pointer-Trick, um den Index im fields-Array zu bestimmen
-#define setField(f, v) do { \
+/*#define setField_ltm(f, v) do { \
     sent2Core0((&(f) - fields), (int32_t)(v)); \
     if (debugVal == 'Y') { \
         printf("\r %-25s | Value: %8ld        ", #f, (int32_t)(v)); \
         fflush(stdout); \
     } \
-} while(0)
+} while(0)*/
+
+// Saubere C++-Funktion ohne Makro und ohne Zugriff auf fields[]
+void setField_ltm(uint8_t idx, int32_t val) {
+    sent2Core0(idx, val);
+    
+    if (debugVal == 'Y') {
+        printf("\r Field Index: %3u          | Value: %8ld        ", idx, val);
+        fflush(stdout);
+    }
+}
+
 
 
 
@@ -94,19 +106,7 @@ void parse_inav_ltm() {
 
     static uint32_t last_packet_ms = now_ms;
     ltm_data_rx_flag = false;
-        // =====================================================================
-        // 🟢 DER ULTRA-DUNKEL-TRICK FÜR DEN LEERLAUF:
-        // Wir lassen die Stufe 1 nur noch alle 120ms (Modulo 10) ganz kurz 
-        // aufblitzen, den Rest der Zeit ist sie aus (0, 0, 0). 
-        // Für das Auge ergibt das ein perfekt gedimmtes, mattes Glimmen!
-        // =====================================================================
-        /*if (now_ms - last_packet_ms >= 200) {
-            if ((now_ms / 12) % 50 == 0) {
-                setRgbColorOn(0, 0, 1); // 🟢 Ganz kurz matt an
-            } else {
-                setRgbColorOn(0, 0, 0); // Aus
-            }
-        } */
+
 
     while (uart_is_readable(INAV_UART)) {
         uint8_t c = uart_getc(INAV_UART);
@@ -163,13 +163,8 @@ void parse_inav_ltm() {
                 uint8_t received_crc = buffer[expected_len - 1];
 
                 if (crc == received_crc) {                               
-                // =============================================================
-                // 🟢 HELLES BLITZEN IN GRÜN BEI ANTWORT:
-                // Ein echtes Paket kam durch! Wir reißen die LED voll auf (Stufe 20).
-                // =============================================================
-                 /* last_packet_ms = now_ms;
-                  setRgbColorOn(0, 0, 1); // 🟢 Helles Blau für das Paket! */      
-                
+
+
                     // ==========================================
                     // G-FRAME: GPS Information (15 Bytes)
                     // ==========================================
@@ -179,25 +174,13 @@ void parse_inav_ltm() {
                         uint8_t ground_speed = buffer[8];
                         int32_t gps_alt = (int32_t)( (uint32_t)buffer[9] | ((uint32_t)buffer[10] << 8) | ((uint32_t)buffer[11] << 16) | ((uint32_t)buffer[12] << 24) );
                         uint8_t sat_info = buffer[13];
-                        
-                        /*fields[LATITUDE].value    = lat;
-                        fields[LONGITUDE].value   = lon;
-                        fields[GROUNDSPEED].value = ground_speed * 100; 
-                        fields[ALTITUDE].value    = gps_alt * 100; // Echte Höhe ohne 1-Meter-Trick    
-                        fields[NUMSAT].value      = sat_info >> 2;
 
-                        fields[LATITUDE].available    = true;
-                        fields[LONGITUDE].available   = true;
-                        fields[GROUNDSPEED].available = true;
-                        fields[ALTITUDE].available    = true;
-                        fields[NUMSAT].available      = true;*/
-
-                        setField(fields[LATITUDE], lat); 
-                        setField(fields[LONGITUDE], lon); 
-                        setField(fields[GROUNDSPEED], ground_speed * 100); 
-                        setField(fields[ALTITUDE], gps_alt * 100);
-                        setField(fields[RELATIVEALT], gps_alt * 100);
-                        setField(fields[NUMSAT], sat_info >> 2);
+                        setField_ltm(LATITUDE, lat); 
+                        setField_ltm(LONGITUDE, lon); 
+                        setField_ltm(GROUNDSPEED, ground_speed * 100); 
+                        setField_ltm(ALTITUDE, gps_alt * 100);
+                        setField_ltm(RELATIVEALT, gps_alt * 100);
+                        setField_ltm(NUMSAT, sat_info >> 2);
                     }
                     
                     // ==========================================
@@ -208,17 +191,9 @@ void parse_inav_ltm() {
                         int16_t roll    = (int16_t)(buffer[2] | (buffer[3] << 8));
                         int16_t heading = (int16_t)(buffer[4] | (buffer[5] << 8));
 
-                        /*fields[PITCH].value   = pitch;
-                        fields[ROLL].value    = roll;
-                        fields[HEADING].value = heading;
-
-                        fields[PITCH].available   = true;
-                        fields[ROLL].available    = true;
-                        fields[HEADING].available = true;*/
-
-                       setField(fields[PITCH], pitch);
-                       setField(fields[ROLL], roll);
-                       setField(fields[HEADING], heading);
+                       setField_ltm(PITCH, pitch);
+                       setField_ltm(ROLL, roll);
+                       setField_ltm(HEADING, heading);
 
                         
                     }
@@ -237,31 +212,14 @@ void parse_inav_ltm() {
                         uint8_t is_armed    = status_byte & 0x01;        
                         uint8_t is_failsafe = (status_byte >> 1) & 0x01; 
 
-                        /*fields[MVOLT].value    = voltage; 
-                        fields[CURRENT].value  = current * 10; 
-                        fields[CAPACITY].value = capacity;
-                        fields[TEMP1].value    = flight_mode;            // Reiner iNav-Modus (z.B. 13 fuer RTH)
-                        fields[TEMP2].value    = is_armed;               // 1 = Armed, 0 = Disarmed
-
-                        // Failsafe-Sonderbehandlung fuer den Sender
-                        if (is_failsafe) {
-                            fields[TEMP2].value = 99;                    // 99 signalisiert Failsafe auf der Jeti
-                        }
-
-                        fields[MVOLT].available    = true;
-                        fields[CURRENT].available  = true;
-                        fields[CAPACITY].available = true;
-                        fields[TEMP1].available    = true; 
-                        fields[TEMP2].available    = true; */
-
-                        setField(fields[MVOLT], voltage);
-                        setField(fields[CURRENT], current * 10);
-                        setField(fields[CAPACITY], capacity);
-                        setField(fields[TEMP1], flight_mode);
+                        setField_ltm(MVOLT, voltage);
+                        setField_ltm(CURRENT, current * 10);
+                        setField_ltm(CAPACITY, capacity);
+                        setField_ltm(TEMP1, flight_mode);
                          if (is_failsafe) {
-                            setField(fields[TEMP2], 99); // Failsafe signalisiert
+                            setField_ltm(TEMP2, 99); // Failsafe signalisiert
                         } else {
-                            setField(fields[TEMP2], is_armed);
+                            setField_ltm(TEMP2, is_armed);
                         }
 
                     }
@@ -271,13 +229,7 @@ void parse_inav_ltm() {
                     // ==========================================
                     else if (frame_type == 'X') {
                         uint16_t ltm_airspeed = buffer[2] | (buffer[3] << 8); 
-                        
-                        /*fields[AIRSPEED].value     = ltm_airspeed; 
-                        fields[AIRSPEED].available = true;*/
-                        
-                        setField(fields[AIRSPEED], ltm_airspeed);
-
-
+                        setField_ltm(AIRSPEED, ltm_airspeed);
                     }
                     // =========================================================
                     // 🟢 DIE RETTUNG FÜR MODUS 1: Das Flag zünden!
@@ -286,12 +238,6 @@ void parse_inav_ltm() {
                     // =========================================================
                     ltm_data_rx_flag = true;     
 
-                    // =============================================================
-                    // 🟢 DER RÜCKSPRUNG: Sobald die Daten verarbeitet sind, 
-                    // schalten wir SOFORT wieder aus. Das erzeugt das perfekte Blitzen!
-                    // =============================================================
-                   // setRgbColorOn(0, 0, 0); 
-                    
                 }
                 state = 0;                                    
                 break;
@@ -300,48 +246,50 @@ void parse_inav_ltm() {
 }
 
 
+
 void simulate_all_sensors_ltm() {
     static uint32_t last_poll_time = 0;
     uint32_t now = to_ms_since_boot(get_absolute_time());
-    extern int32_t live_alt, live_mvolt, live_current, live_speed, live_vspeed, live_sat, live_cap, live_pitch, live_roll, live_heading;
-    extern uint8_t live_flight_mode, live_is_armed;
+    
+    // Bremse auf 200 ms (5 Hz), damit die 50er-Queue zu Core 0 nicht überläuft
+    if (now - last_poll_time < 200) {
+        return;
+    }
+    last_poll_time = now;
 
-        live_alt         = 15000;    
-        live_mvolt       = 12400;    
-        live_current     = 1500;     
-        live_speed       = 4500;     
-        live_sat         = 9;        
-        live_rpm         = 3200;     
-        live_pitch       = 10;       
-        live_roll        = 5;        
-        live_heading     = 180;      
-        live_cap         = 850;  
-        live_flight_mode = 13;
-        live_is_armed    = 1;
-        live_lat         = 471234567; // 47.1234567° N
-        live_lon         = 850123456; // 85.0123456° E
-        live_vspeed       = 1200; // 12 m/s
+    // Alle Simulationswerte setzen (nutzt die globalen Variablen oben in Inav_ltm.cpp)
+    live_alt         = 15000;    
+    live_mvolt       = 12400;    
+    live_current     = 1500;     
+    live_speed       = 4500;     
+    live_sat         = 9;        
+    live_rpm         = 3200;     
+    live_pitch       = 10;       
+    live_roll        = 5;        
+    live_heading     = 180;      
+    live_cap         = 850;  
+    live_flight_mode = 13;
+    live_is_armed    = 1;
+    live_lat         = 471234567; // 47.1234567° N
+    live_lon         = 850123456; // 85.0123456° E
+    live_vspeed      = 1200;      // 12 m/s
 
-        setField(fields[ALTITUDE], live_alt); 
-        setField(fields[RELATIVEALT], live_alt); 
-        setField(fields[MVOLT], live_mvolt);
-        setField(fields[CURRENT], live_current);
-        setField(fields[GROUNDSPEED], live_speed);
-        setField(fields[NUMSAT], live_sat);
-        setField(fields[RPM], live_rpm);
-        setField(fields[PITCH], live_pitch);
-        setField(fields[ROLL], live_roll);
-        setField(fields[HEADING], live_heading);
-        setField(fields[CAPACITY], live_cap);
-        setField(fields[TEMP1], live_flight_mode);
-        setField(fields[TEMP2], live_is_armed);
-        setField(fields[RESERVE2], live_mvolt); 
-        setField(fields[VSPEED], live_speed);
-
-
-    // --- 3. HARDWARE-BLINKTAKTSYNC ---
-    //if ((now / 1500) % 2 == 0) { setRgbColorOn(0, 0, 1); } else { setRgbColorOn(0, 0, 0); }
-
+    // Direkte Übergabe der Indizes an Core 0 (ohne fields[])
+    setField_ltm(ALTITUDE,    live_alt); 
+    setField_ltm(RELATIVEALT, live_alt); 
+    setField_ltm(MVOLT,       live_mvolt);
+    setField_ltm(CURRENT,     live_current);
+    setField_ltm(GROUNDSPEED, live_speed);
+    setField_ltm(NUMSAT,      live_sat);
+    setField_ltm(RPM,         live_rpm);
+    setField_ltm(PITCH,       live_pitch);
+    setField_ltm(ROLL,        live_roll);
+    setField_ltm(HEADING,     live_heading);
+    setField_ltm(CAPACITY,    live_cap);
+    setField_ltm(TEMP1,       live_flight_mode);
+    setField_ltm(TEMP2,       live_is_armed);
+    setField_ltm(RESERVE2,    live_mvolt); 
+    setField_ltm(VSPEED,      live_vspeed);
 }
 
 void parse_inav_ltm_OK() {

@@ -303,7 +303,7 @@ void MPU::gyroCalibrationExecute(){
     //    printf ("Error in IMU calibration: to much variations in the acceleration values\n");
     //    return;
     //}
-    #define MAX_GYRO_DIFF 200
+    #define MAX_GYRO_DIFF 450
     if (((gxMax - gxMin) > MAX_GYRO_DIFF) or ((gyMax - gyMin) > MAX_GYRO_DIFF) or ((gzMax - gzMin) > MAX_GYRO_DIFF)) {
         printf ("Error in gyro calibration: to much variations in the gyro rates values\n");
         return;
@@ -445,7 +445,7 @@ void MPU::nextAccCalibrationExecute(){
 #define KP1_LOW_LIMIT 0.975
 #define KP1_HIGH_LIMIT 1.025
 #define KP1 2.0 // 2.0
-#define KI1 0.0
+#define KI1 0.08f
 
 #define KP2_LOW_LIMIT 0.950
 #define KP2_HIGH_LIMIT 1.050
@@ -474,9 +474,12 @@ void Mahony_update(float ax, float ay, float az, float gx, float gy, float gz, f
         kp = 0;
         ki = 0;
     }
+   /* if (msgEverySec(0)) {
+        printf("IMU-Check -> totalAccG=%.3f | kp=%.3f | ki=%.3f\n", totalAccG, kp, ki);
+    }*/
 
         // REPARATUR: tmp berechnen (Summe der Quadrate der Beschleunigungen)
-    //tmp = ax * ax + ay * ay + az * az;
+    tmp = ax * ax + ay * ay + az * az;
     // 
     // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
     if (tmp > 0.0) {
@@ -747,8 +750,11 @@ bool MPU::getAccZWorld(){ // return true when a value is available ; read the IM
     // Dadurch bleibt der Filter im Hintergrund still, das Rauschen sinkt unter 200,
     // und MPUCAL=G läuft sofort wieder fehlerfrei durch!
     
+    // Wenn oXs gerade Accel oder Gyro kalibriert, Mahony-Update pausieren!
+    // Nur bei aktiver 3D-Accel-Kalibrierung pausieren (nicht bei calibrateImuGyro!)
+    //if (!calibAccRunning) {
         Mahony_update( (float) oax, (float) oay, (float) oaz , ((float) ogx) * gyroScaleRad, ((float) ogy) * gyroScaleRad , ((float) ogz) * gyroScaleRad, deltat);
-    
+   // }
     // Jetzt rufen wir Mahony mit den bereinigten ogx, ogy, ogz auf:
    // Mahony_update( (float) oax, (float) oay, (float) oaz , ((float) ogx) * gyroScaleRad, ((float) ogy) * gyroScaleRad , ((float) ogz) * gyroScaleRad, deltat);
     // this formula to calculate vertical accz comes from

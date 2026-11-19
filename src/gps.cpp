@@ -542,7 +542,10 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
             
             // Nutzt config-Werte, falls vorhanden (> 0), andernfalls die neuen Kopf-Konstanten
             float target_orbit_r  = (config.rth_min_Dist > 0)  ? config.rth_min_Dist  : DEFAULT_RTH_MIN_DIST;       
-            int32_t min_speed_cms = (config.rth_min_Speed > 0) ? config.rth_min_Speed : DEFAULT_RTH_MIN_SPEED;        
+            //int32_t min_speed_cms = (config.rth_min_Speed > 0) ? config.rth_min_Speed : DEFAULT_RTH_MIN_SPEED;       
+            // Wandelt die eingestellten km/h aus der Config (RTS=...) direkt in cm/s für den Code um
+            int32_t min_speed_cms = (config.rth_min_Speed > 0) ? (config.rth_min_Speed * 28) : DEFAULT_RTH_MIN_SPEED;
+ 
             float gain_factor     = RTH_GAIN_FACTOR;          
         
 
@@ -555,16 +558,30 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
                 float track_deg = atan2f(move_lon, move_lat) * 57.2957795f;
                 if (track_deg < 0.0f) track_deg += 360.0f;
 
-                float loiter_track = GPS_bearing + 90.0f;
-                if (loiter_track >= 360.0f) loiter_track -= 360.0f;
+                // 1. Direkte Richtung vom Fahrzeug ZUM Startpunkt (Home) berechnen (0° bis 360°)
+                float bearing_to_home = GPS_bearing + 180.0f;
+                if (bearing_to_home >= 360.0f) bearing_to_home -= 360.0f;
 
-                float approach_angle = (distance_m - target_orbit_r) * gain_factor; 
-                if (approach_angle > 45.0f)  approach_angle = 45.0f;  
-                if (approach_angle < -45.0f) approach_angle = -45.0f; 
+                // 2. Tangenten-Winkel (alpha) zum Kreisrand bestimmen
+                float tangent_offset_deg = 0.0f;
 
-                float target_heading = loiter_track + approach_angle;
+                if (distance_m > target_orbit_r) {
+                    // AUSSERHALB DES KREISES: Exakte Tangente mit arcsin(R / D) berechnen
+                    float ratio = target_orbit_r / distance_m;
+                    if (ratio > 1.0f) ratio = 1.0f; // Schutz vor Rundungsfehlern > 1.0
+                    tangent_offset_deg = asinf(ratio) * 57.2957795f; // Ergibt 0° (weit weg) bis 90° (am Kreis)
+                } else {
+                    // INNERHALB DES KREISES: Sanft nach außen auf den Kreisrand drücken (90° bis 135°)
+                    float inside_ratio = (target_orbit_r - distance_m) / target_orbit_r;
+                    tangent_offset_deg = 90.0f + (inside_ratio * 45.0f);
+                }
+
+                // 3. Zielkurs festlegen (Minus für Kreis im Uhrzeigersinn, Plus für Gegenuhrzeigersinn)
+                float target_heading = bearing_to_home - tangent_offset_deg;
+                if (target_heading < 0.0f)    target_heading += 360.0f;
                 if (target_heading >= 360.0f) target_heading -= 360.0f;
 
+                // 4. Lenkwinkel ermitteln (-180° bis +180°) und auf 0–10000 skalieren
                 float turn_angle = target_heading - track_deg;
                 if (turn_angle > 180.0f)  turn_angle -= 360.0f;
                 if (turn_angle < -180.0f) turn_angle += 360.0f;
@@ -572,8 +589,9 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
                 float telemetry_value = ((turn_angle / 3.6f) + 50.0f) * 100.0f;
                 GPS_custom_steering = (int32_t)telemetry_value;
             } else {
-                GPS_custom_steering = 5000; 
+               // GPS_custom_steering = 5000; 
             }
+
 
             last_ubx_lat = _buffer.posllh.latitude;
             last_ubx_lon = _buffer.posllh.longitude;

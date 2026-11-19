@@ -314,7 +314,7 @@ void fillFrameGps(uint8_t idx){
         //fields[NUMSAT].available = false;
 
         if (!(config.inav_ltm == 3 || config.inav_ltm == 4)) {
-            fields[NUMSAT].available = false;
+           // fields[NUMSAT].available = false;
         }
     //} else {
     //    fillBufferI32( 0u );    // lat

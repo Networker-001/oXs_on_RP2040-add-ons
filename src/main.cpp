@@ -184,7 +184,7 @@ extern queue_t fbusRxQueue; // Sagt dem Compiler, dass die Queue existiert
 extern void handleMultiProtocol_N(uint8_t b); // 🟢 KORREKTUR: Zwingt den Compiler, die Funktion zu kennen
 extern void read_frsky_sensors_core1(void); // 🟢 KORREKTUR: Zwingt den Compiler, die Funktion zu kennen
 
-void getSensors_ltm(void); // Funktions-Prototyp bekannt machen
+//void getSensors_ltm(void); // Funktions-Prototyp bekannt machen
 
 
 // Globales Lipo-Array für die Einzelzellen (Einheit: Millivolt)
@@ -278,47 +278,18 @@ bool GpsAlt = false; // Flag to indicate if GPS altitude is available
 // Wir nutzen die von mstrens initialisierte Rx-Queue
 extern queue_t fbusRxQueue; 
 
-void setupI2c(){
-    if ( config.pinScl == 255 || config.pinSda == 255) return; // skip if pins are not defined
-    // send 10 SCL clock to force sensor to release sda
-    /*
-    gpio_init(config.pinSda);
-    gpio_init(config.pinScl);
-    gpio_set_dir(config.pinSda, GPIO_IN);
-    gpio_set_dir(config.pinScl, GPIO_OUT);
-    gpio_pull_up(config.pinSda);
-    gpio_pull_up(config.pinScl);
-    sleep_us(10);
-    while ( gpio_get(config.pinSda) == 0) {;
-        
-        for (uint8_t i=0; i<9; i++){
-            gpio_put(config.pinScl, 1);
-            sleep_us(10);
-            gpio_put(config.pinScl, 0);
-            sleep_us(10);
-            printf("trying to unlock I2C\n");
-        }
-    }    
-    gpio_put(config.pinScl, 1);
-    gpio_set_dir(config.pinSda, GPIO_OUT);
-    gpio_put(config.pinScl, 0);
-    sleep_us(10);
-    gpio_put(config.pinSda, 0);
-    sleep_us(10);
-    gpio_put(config.pinScl, 1);
-    sleep_us(10);
-    gpio_put(config.pinSda, 1);
-    sleep_us(10);
-    gpio_set_dir(config.pinSda, GPIO_IN);
-    if ( gpio_get(config.pinSda) == 0) printf("I2C still locked\n");    
-    */
-    // initialize I2C     
-    i2c_init( i2c1, 400 * 1000);
-    gpio_set_function(config.pinSda, GPIO_FUNC_I2C);
-    gpio_set_function(config.pinScl, GPIO_FUNC_I2C);
-    gpio_pull_up(config.pinSda);
-    gpio_pull_up(config.pinScl); 
+
+volatile uint8_t testU8 = 0;
+void test_callback(uint alarmNum){
+    testU8++;
 }
+
+
+
+//======================================================================================
+//           Empfänger / SBUS / Sequenzer / Gyro ...
+//======================================================================================
+#define MAIN_LOOP 0
 
 void setColorState(){    // set the colors based on the RF link
     lastBlinkMillis = millisRp(); // reset the timestamp for blinking
@@ -346,126 +317,6 @@ void setColorState(){    // set the colors based on the RF link
             break;     
     }
 }
-
-void setupSensors(){     // this runs on core1!!!!!!!!
-      
-      //sleep_ms(3000);
-      //printf("start core1 setup\n");
-      //startTimerUs(0); //xxxxx to debug only 
-      voltage.begin();      
-      //printf("voltage done\n");
-      setupI2c();      // setup I2C
-      //printf("i2C done\n");
-      baro1.begin();  // check MS5611; when ok, baro1.baroInstalled  = true
-      //printf("baro1 done\n");
-      if (! baro1.baroInstalled) {
-        baro2.begin();  // check SPL06;  when ok, baro2.baroInstalled  = true
-        //printf("baro2 done\n");
-      }
-      if (! ( baro1.baroInstalled or baro2.baroInstalled)) {
-        baro3.begin(); // check BMP280;  when ok, baro3.baroInstalled  = true
-        //printf("baro3 done\n");
-      }
-      // Waveshare 1.0.2 board has a LPS22HB baro on it; we check it only if no other baro is installed:
-      if (! (baro1.baroInstalled or baro2.baroInstalled or baro3.baroInstalled)) {
-        baro4.begin(); 
-      }
-
-      adc1.begin() ; 
-      //printf("adc1 done\n");
-      adc2.begin() ;
-      //printf("adc2 done\n");
-      #ifndef KX134_IS_USED
-      mpu.begin();
-      #else
-      kx134.begin(); 
-      #endif
-      //printf("mpu done\n");
-    //blinkRgb(0,10,0,500,1000000); blink red, green, blue at 500 msec for 1000 0000 X
-      gps.setupGps();  //use a Pio and 1 sm (in fact reuse the same sm for RX after TX)
-      //printf("gps done\n");
-      ms4525.begin();
-      if (! ms4525.airspeedInstalled) {
-        sdp3x.begin();
-        if (! sdp3x.airspeedInstalled) {
-            xgzp.begin();
-        }
-      }
-      #ifdef USEDS18B20
-      ds18b20Setup(); 
-      #endif
-      setupRpm(); // this function perform the setup of pio Rpm
-      //printf("rpm done\n");
-      
-      setupEsc() ; 
-
-      core1SetupDone = true;
-      //printf("end core1 setup\n") ;    
-      //getTimerUs(0);   // xxxxx
-}
-
-// read and update all sensor values (runs on core 1)		
-void getSensors(void){                                                          // this runs on core1
-
-  
-		voltage.getVoltages();                                                   // read voltage sensors
-		
-		if ( baro1.baroInstalled){                                              // check if baro 1 is present
-			if ( baro1.getAltitude() == 0) {                                      // calculate altitude for baro 1
-				vario1.calculateAltVspeed(baro1.altitudeCm , baro1.altIntervalMicros ); 
-			}
-		} else if ( baro2.baroInstalled){                                        // check if baro 2 is present
-			if ( baro2.getAltitude() == 0) {                                      // calculate altitude for baro 2
-				vario1.calculateAltVspeed(baro2.altitudeCm , baro2.altIntervalMicros); 
-			}
-		} else if (baro3.baroInstalled) {                                        // check if baro 3 is present
-			if ( baro3.getAltitude() == 0) {                                      // calculate altitude for baro 3
-				vario1.calculateAltVspeed(baro3.altitudeCm , baro3.altIntervalMicros); 
-			}
-		} else if (baro4.baroInstalled) {                                        // check if baro 4 (LPS22HB) is present
-			if ( baro4.getAltitude() == 0) {                                      // calculate altitude for baro 4
-				vario1.calculateAltVspeed(baro4.altitudeCm , baro4.altIntervalMicros); 
-			}
-		}
-
-		adc1.readSensor();                                                      // read analog sensor 1
-		adc2.readSensor();                                                      // read analog sensor 2
-		mpu.getAccZWorld();                                                     // read mpu acc Z
-		#ifdef KX134_IS_USED
-		kx134.getAcc();                                                         // read kx134 acc
-		#endif  
-
-		gps.readGps();								                            // Alternativer Standard GPS-Parser
-
-		if (ms4525.airspeedInstalled){                                          // check MS4525 airspeed sensor
-			ms4525.getDifPressure();                                              // read differential pressure
-			calculateAirspeed( );                                                 // calculate airspeed
-			vario1.calculateVspeedDte();                                          // calculate DTE vspeed
-		}
-		if (sdp3x.airspeedInstalled){                                           // check SDP3X airspeed sensor
-			sdp3x.getDifPressure();                                               // read differential pressure
-			calculateAirspeed( );                                                 // calculate airspeed
-			vario1.calculateVspeedDte();                                          // calculate DTE vspeed
-		}
-		if (xgzp.airspeedInstalled){                                            // check XGZP airspeed sensor
-			xgzp.getDifPressure();                                                // read differential pressure
-			calculateAirspeed( );                                                 // calculate airspeed
-			vario1.calculateVspeedDte();                                          // calculate DTE vspeed
-		}
-		readRpm();                                                              // read RPM sensor
-		handleEsc();                                                            // process ESC telemetry
-		#ifdef USE_DS18B20
-		ds18b20Read();                                                          // read DS18B20 temperature sensor
-		#endif
-  
-  
-  // Berechnung für den Anstellwinkel (AoA) - läuft für beide Modi, falls die Daten da sind
-  if (fields[VSPEED].onceAvailable && fields[GROUNDSPEED].onceAvailable && fields[PITCH].onceAvailable){ 
-    float aoa = (float) fields[PITCH].value -  atan2f((float) fields[VSPEED].value, (float) fields[GROUNDSPEED].value) * 180.0 / 3.1416; 
-    sent2Core0( RESERVE5 , (int32_t) aoa) ;                                     
-  }
-}
-
 
 enum bootButtonStates_t {NOT_ARMED, ARMED, SAVED};
 bootButtonStates_t bootButtonState =  NOT_ARMED;
@@ -498,13 +349,94 @@ void handleBootButton(){
     }
 }
 
-volatile uint8_t testU8 = 0;
-void test_callback(uint alarmNum){
-    testU8++;
+bool ltm_data_rx_flag = false; 
+
+void handle_ltm_led_core0() {
+    static uint32_t last_packet_time = 0;
+    uint32_t ms = to_ms_since_boot(get_absolute_time());
+
+    if ((config.inav_ltm == 2)||(config.inav_ltm == 4)  )  {
+        static bool pause_eingeleitet = false; // Merker für die Pause
+
+        if (ms % 50 < 10){
+            pause_eingeleitet = false; // AN-Phase läuft, Merker zurücksetzen
+            
+            // Unser erprobtes, mattes Takt-Flimmern für die Augen
+            if ((ms / 12) % 10 == 0) {
+                setRgbColorOn(0, 0, 10); // 🔵 Mattes Blau-Flackern
+                            } else {
+                setRgbColorOn(0, 0, 0); 
+            }
+        } else {
+            // AUS-Phase läuft! Wir schalten die LED NUR EINMALIG hart aus:
+            if (!pause_eingeleitet) {
+                setRgbColorOn(0, 0, 0);    // LED komplett abdunkeln
+                pause_eingeleitet = true;  // Sperre setzen, damit der Treiber Ruhe hat!
+            }
+        }
+                // Schritt 2: Die Schranke für die große Halbsekunden-Pause dahinter setzen!
+        // In den zweiten 500ms der Sekunde knallen wir die LED unbarmherzig auf Null.
+        if (ms % 1000 >= 500) {
+            setRgbColorOn(0, 0, 0); // Absolute, digitale Funkstille für eine halbe Sekunde!
+        }
+    }
+
+
+
+    // =========================================================================
+    // 🟢 DIE PHYSIKALISCHE RETTUNG FÜR MODUS 1 / 3 (INTELLIGENTES SUCH-BLINKEN):
+    // Frei von blockierenden Treibersperren. Rechnet stur im sauberen Takt!
+    // =========================================================================
+    else if (config.inav_ltm == 1 || config.inav_ltm == 3) {
+        // Wir prüfen dein originales Parser-Flag
+        if (ltm_data_rx_flag == true) {
+            last_packet_time = ms;
+            ltm_data_rx_flag = false; 
+        }
+
+        // ---------------------------------------------------------------------
+        // ZUSTAND 1: DATEN SIND DA! (Hektisches, super mattes Blau-Flackern)
+        // ---------------------------------------------------------------------
+        if (ms - last_packet_time < 300) {
+            if (ms % 60 < 30) {
+                if ((ms / 12) % 10 == 0) {
+                    setRgbColorOn(0, 0, 1); // 🔵 Mattes Blau-Flackern bei Empfang
+                } else {
+                    setRgbColorOn(0, 1, 0);
+                }
+            } else {
+               // setRgbColorOn(0, 0, 0);
+            }
+        } 
+        // ---------------------------------------------------------------------
+        // ZUSTAND 2: KEINE DATEN DA! (Ruhiges Suchen-Blinken im Sekundentakt)
+        // Kopiert eins zu eins die Logik aus Modus 2, die bei dir perfekt läuft!
+        // ---------------------------------------------------------------------
+        else {
+            static bool suche_pause_gesendet = false; // Sperr-Merker für die AUS-Phase
+
+            if (ms % 1000 < 500) {
+                suche_pause_gesendet = false; // AN-Phase läuft, Merker zurücksetzen
+                
+                // Exakt dein funktionierendes Flimmer-Raster aus Modus 2
+                if ((ms / 12) % 10 == 0) {
+                    setRgbColorOn(0, 0, 1); // 🔵 Mattes Blau-Flackern in der AN-Phase
+                } else {
+                    setRgbColorOn(0, 0, 0); 
+                }
+            } else {
+                // AUS-Phase läuft! Wir senden das "Aus" NUR EIN EINZIGES MAL:
+                if (!suche_pause_gesendet) {
+                    setRgbColorOn(0, 0, 0);       // LED komplett abdunkeln
+                    suche_pause_gesendet = true;  // Sperre setzen, Treiber hat Sendepause!
+                }
+            }
+        }
+       // setRgbColorOn(0, 0, 20);
+    }
+    
 }
 
-
-// process incoming sensor data and commands queued from core 1
 void getSensorsFromCore1(){
     queue_entry_t entry;
     //printf("qlevel= %d\n",queue_get_level(&qSensorData));
@@ -566,145 +498,6 @@ void getSensorsFromCore1(){
     if ((forcedFields == 1) || (forcedFields == 2)) fillFields(forcedFields); // force dummy values for debuging a protocol
 }
 
-
-
-/*
-void printTest(int testVal){
-    static uint32_t prevTime = 0;
-    if ((millisRp() - prevTime) > 10) { // once per 5 sec
-        prevTime = millisRp();
-        printf("test value=%i\n",testVal);
-        if (configIsValid) {printf("config is valid\n");} else {printf("config is not valid\n");} 
-    }
-}
-*/
-
-// Am Anfang der Datei (außerhalb der Funktionen) das neue Flag deklarieren:
-bool ltm_data_rx_flag = false; 
-
-void handle_ltm_led_core1() {
-    static uint32_t last_packet_time = 0;
-    uint32_t ms = to_ms_since_boot(get_absolute_time());
-
-    if ((config.inav_ltm == 2)||(config.inav_ltm == 4)  )  {
-        static bool pause_eingeleitet = false; // Merker für die Pause
-
-        if (ms % 50 < 10){
-            pause_eingeleitet = false; // AN-Phase läuft, Merker zurücksetzen
-            
-            // Unser erprobtes, mattes Takt-Flimmern für die Augen
-            if ((ms / 12) % 10 == 0) {
-                setRgbColorOn(0, 0, 10); // 🔵 Mattes Blau-Flackern
-                            } else {
-                setRgbColorOn(0, 0, 0); 
-            }
-        } else {
-            // AUS-Phase läuft! Wir schalten die LED NUR EINMALIG hart aus:
-            if (!pause_eingeleitet) {
-                setRgbColorOn(0, 0, 0);    // LED komplett abdunkeln
-                pause_eingeleitet = true;  // Sperre setzen, damit der Treiber Ruhe hat!
-            }
-        }
-                // Schritt 2: Die Schranke für die große Halbsekunden-Pause dahinter setzen!
-        // In den zweiten 500ms der Sekunde knallen wir die LED unbarmherzig auf Null.
-        if (ms % 1000 >= 500) {
-            setRgbColorOn(0, 0, 0); // Absolute, digitale Funkstille für eine halbe Sekunde!
-        }
-    }
-
-
-
-    // =========================================================================
-    // 🟢 DIE PHYSIKALISCHE RETTUNG FÜR MODUS 1 (INTELLIGENTES SUCH-BLINKEN):
-    // Frei von blockierenden Treibersperren. Rechnet stur im sauberen Takt!
-    // =========================================================================
-    else if (config.inav_ltm == 1 || config.inav_ltm == 3) {
-        // Wir prüfen dein originales Parser-Flag
-        if (ltm_data_rx_flag == true) {
-            last_packet_time = ms;
-            ltm_data_rx_flag = false; 
-        }
-
-        // ---------------------------------------------------------------------
-        // ZUSTAND 1: DATEN SIND DA! (Hektisches, super mattes Blau-Flackern)
-        // ---------------------------------------------------------------------
-        if (ms - last_packet_time < 300) {
-            if (ms % 60 < 30) {
-                if ((ms / 12) % 10 == 0) {
-                    setRgbColorOn(0, 0, 1); // 🔵 Mattes Blau-Flackern bei Empfang
-                } else {
-                    setRgbColorOn(0, 1, 0);
-                }
-            } else {
-               // setRgbColorOn(0, 0, 0);
-            }
-        } 
-        // ---------------------------------------------------------------------
-        // ZUSTAND 2: KEINE DATEN DA! (Ruhiges Suchen-Blinken im Sekundentakt)
-        // Kopiert eins zu eins die Logik aus Modus 2, die bei dir perfekt läuft!
-        // ---------------------------------------------------------------------
-        else {
-            static bool suche_pause_gesendet = false; // Sperr-Merker für die AUS-Phase
-
-            if (ms % 1000 < 500) {
-                suche_pause_gesendet = false; // AN-Phase läuft, Merker zurücksetzen
-                
-                // Exakt dein funktionierendes Flimmer-Raster aus Modus 2
-                if ((ms / 12) % 10 == 0) {
-                    setRgbColorOn(0, 0, 1); // 🔵 Mattes Blau-Flackern in der AN-Phase
-                } else {
-                    setRgbColorOn(0, 0, 0); 
-                }
-            } else {
-                // AUS-Phase läuft! Wir senden das "Aus" NUR EIN EINZIGES MAL:
-                if (!suche_pause_gesendet) {
-                    setRgbColorOn(0, 0, 0);       // LED komplett abdunkeln
-                    suche_pause_gesendet = true;  // Sperre setzen, Treiber hat Sendepause!
-                }
-            }
-        }
-       // setRgbColorOn(0, 0, 20);
-    }
-    
-}
-
-void getSensors_ltm(void) {
-
-    uint32_t now_ms = millisRp(); // Holt den Millisekunden-Takt von Core 0
-    uint32_t now = to_ms_since_boot(get_absolute_time());
-
-    // Zeitstempel für das letzte LTM-Paket merken
-    static uint32_t last_ltm_packet_ms = 0;
-
-    // =========================================================================
-    // MODUS 1: LTM Echtbetrieb über den Hardware-UART
-    // =========================================================================
-    if (config.inav_ltm == 1)  {
-
-        bool altWasAvailable = fields[ALTITUDE].available;
-        bool voltWasAvailable = fields[MVOLT].available;
-
-        parse_inav_ltm(); // Rattert durch deinen LTM Seriell-Parser
-
-
-    } 
-    // =========================================================================
-    // MODUS 2: LTM Simulationsbetrieb am Schreibtisch
-    // =========================================================================
-    else if (config.inav_ltm == 2) {
-
-        simulate_all_sensors_ltm();
-    }
-    
-}
-
-
-
-#define MAIN_LOOP 0
-
-
-
-// Initialisiert das Gesamtsystem, alle Schnittstellen und Telemetrie-Protokolle
 void setup() {
 	stdio_init_all();								// Standard-I/O für USB-Debug initialisieren
 	set_sys_clock_khz(133000, false);				// Systemtakt auf 133 MHz festlegen
@@ -732,18 +525,21 @@ void setup() {
 	setupSequencers();								// Sequenzerparameter laden
 	setupGyroMixer();								// Kreisel-Mischer initialisieren
 	checkConfigAndSequencers();						// Konfigurationsprüfung durchführen
+	setupLed();							    		// Status-LED initialisieren
 
     if ((config.inav_ltm == 1)||(config.inav_ltm == 2 ) ) {
-	  setupLed();									// Status-LED initialisieren
-	  setRgbColorOn(0, 0, 10);						// LED auf Rot schalten während Setup
+	  setRgbColorOn(0, 0, 10);						// LED auf Blau schalten während Setup
     }
     else if (config.inav_ltm == 0) {
-	  setupLed();									// Status-LED initialisieren
-	  setRgbColorOn(10, 0, 0);						// LED auf Blau schalten während Setup
+	  setRgbColorOn(10, 0, 0);						// LED auf Rot schalten während Setup
+    }
+    else  if ((config.inav_ltm == 3)||(config.inav_ltm == 4 ) ) {
+	  setRgbColorOn(0, 10, 0);						// LED auf Grün schalten während Setup
     }
 
   // Ämderung durch INAV
-	if (configIsValid || (config.inav_ltm <= 2)) {								// Setup nur bei gültiger Konfig ausführen
+	//if (configIsValid || (config.inav_ltm <= 2)) {								// Setup nur bei gültiger Konfig ausführen
+	if (configIsValid || (config.inav_ltm > 0)) {						     		// Setup nur bei gültiger Konfig ausführen
 
 
 		if (config.pinHigh < 30) {					// Pin High-Level Erzwingung
@@ -779,17 +575,7 @@ void setup() {
 		uint32_t core1SetupUs = microsRp() - setup1StartUs; // Dauer Core 1 Setup berechnen
 		printf("Setup1 takes %d usec\n", (int)core1SetupUs); // Ausführungszeit ausgeben
 
-
-
-		// INAV Initialisierung
-		if ((config.inav_ltm == 1 ) || (config.inav_ltm == 2 )) { // iNav LTM Telemetrie
-			init_inav_ltm();						// LTM UART auf GP4 starten
-		} 
-		// INAV Initialisierung
-		//if (config.inav_ltm == 3 ) { // iNav LTM Telemetrie
-		//	init_inav_frsky();						// LTM UART auf GP4 starten
-		//}    
-
+  
         // Empfänger / Telemetrie-Protokoll Initialisierung
         if (config.protocol == 'C') {		// CRSF Protokoll
 			setupCrsfIn();							// Primären Rx-UART einrichten
@@ -856,7 +642,7 @@ void loop() {
 
 
     // 2. Phase: Nach 4 Sekunden schaltet der normale oXs-Ablauf ein
-    if (((configIsValid) and (configIsSaved)) or (config.inav_ltm > 0)) {  // only if config is valid or inav_ltm is active, we run the main loop
+    if (((configIsValid) and (configIsSaved)) or (config.inav_ltm >= 1)) {  // only if config is valid or inav_ltm is active, we run the main loop
 
 
 
@@ -866,13 +652,15 @@ void loop() {
       // =================================================================
       if ((config.inav_ltm == 1) || (config.inav_ltm == 2) ) {
           //getSensors_ltm();     // Verarbeitet Einlesen, Tischtest & Dauerfeuer direkt auf Core 0
-          handle_ltm_led_core1();
+          handle_ltm_led_core0();
 
-      } else {
-          
-          //handle_ltm_led_core1();
+      } else if ((config.inav_ltm == 3) || (config.inav_ltm == 4) ) {
+          //getSensors_ltm();     // Verarbeitet Einlesen, Tischtest & Dauerfeuer direkt auf Core 0
+          handle_ltm_led_core0();
       }
+
       getSensorsFromCore1(); // Holt im Normalmodus die Hardware-Sensoren von Core 1
+
       printAllTelemetryValues();
 
       // =================================================================
@@ -1004,11 +792,6 @@ void loop() {
  
 }
 
-int main_o(){
-  setup();
-  while(1) loop();
-}
-
 int main() {
     setup();
     
@@ -1027,33 +810,191 @@ int main() {
 
 
 //======================================================================================
+//           Sensoren / LTM  / FRSKY IN
+//======================================================================================
+#define MAIN_LOOP1 1
 
-// initialisation of core 1 that capture the sensor data
-void setup1(){
-    multicore_lockout_victim_init();
-    setupSensors();    
-    
-    if ((config.inav_ltm == 3)||(config.inav_ltm == 4 ) ) {
-	  setupLed();									// Status-LED initialisieren
-	  setRgbColorOn(2, 0, 0);						// LED auf Grün schalten während Setup
-    }
-
-    if (config.inav_ltm >= 3 ) { // iNav LTM Telemetrie
-        init_frsky_sensors_core1(); 
-        //init_inav_frsky();       // LTM UART auf GP4 starten
-    }  
+void setupI2c(){
+    if ( config.pinScl == 255 || config.pinSda == 255) return; // skip if pins are not defined
+    // send 10 SCL clock to force sensor to release sda
+    /*
+    gpio_init(config.pinSda);
+    gpio_init(config.pinScl);
+    gpio_set_dir(config.pinSda, GPIO_IN);
+    gpio_set_dir(config.pinScl, GPIO_OUT);
+    gpio_pull_up(config.pinSda);
+    gpio_pull_up(config.pinScl);
+    sleep_us(10);
+    while ( gpio_get(config.pinSda) == 0) {;
+        
+        for (uint8_t i=0; i<9; i++){
+            gpio_put(config.pinScl, 1);
+            sleep_us(10);
+            gpio_put(config.pinScl, 0);
+            sleep_us(10);
+            printf("trying to unlock I2C\n");
+        }
+    }    
+    gpio_put(config.pinScl, 1);
+    gpio_set_dir(config.pinSda, GPIO_OUT);
+    gpio_put(config.pinScl, 0);
+    sleep_us(10);
+    gpio_put(config.pinSda, 0);
+    sleep_us(10);
+    gpio_put(config.pinScl, 1);
+    sleep_us(10);
+    gpio_put(config.pinSda, 1);
+    sleep_us(10);
+    gpio_set_dir(config.pinSda, GPIO_IN);
+    if ( gpio_get(config.pinSda) == 0) printf("I2C still locked\n");    
+    */
+    // initialize I2C     
+    i2c_init( i2c1, 400 * 1000);
+    gpio_set_function(config.pinSda, GPIO_FUNC_I2C);
+    gpio_set_function(config.pinScl, GPIO_FUNC_I2C);
+    gpio_pull_up(config.pinSda);
+    gpio_pull_up(config.pinScl); 
 }
 
+void setupSensors(){     // this runs on core1!!!!!!!!
+      
+      //sleep_ms(3000);
+      //printf("start core1 setup\n");
+      //startTimerUs(0); //xxxxx to debug only 
+      voltage.begin();      
+      //printf("voltage done\n");
+      setupI2c();      // setup I2C
+      //printf("i2C done\n");
+      baro1.begin();  // check MS5611; when ok, baro1.baroInstalled  = true
+      //printf("baro1 done\n");
+      if (! baro1.baroInstalled) {
+        baro2.begin();  // check SPL06;  when ok, baro2.baroInstalled  = true
+        //printf("baro2 done\n");
+      }
+      if (! ( baro1.baroInstalled or baro2.baroInstalled)) {
+        baro3.begin(); // check BMP280;  when ok, baro3.baroInstalled  = true
+        //printf("baro3 done\n");
+      }
+      // Waveshare 1.0.2 board has a LPS22HB baro on it; we check it only if no other baro is installed:
+      if (! (baro1.baroInstalled or baro2.baroInstalled or baro3.baroInstalled)) {
+        baro4.begin(); 
+      }
 
-// main loop on core 1 in order to read the sensors and send the data to core0
-#define MAIN_LOOP1 1
+      adc1.begin() ; 
+      //printf("adc1 done\n");
+      adc2.begin() ;
+      //printf("adc2 done\n");
+      #ifndef KX134_IS_USED
+      mpu.begin();
+      #else
+      kx134.begin(); 
+      #endif
+      //printf("mpu done\n");
+    //blinkRgb(0,10,0,500,1000000); blink red, green, blue at 500 msec for 1000 0000 X
+      gps.setupGps();  //use a Pio and 1 sm (in fact reuse the same sm for RX after TX)
+      //printf("gps done\n");
+      ms4525.begin();
+      if (! ms4525.airspeedInstalled) {
+        sdp3x.begin();
+        if (! sdp3x.airspeedInstalled) {
+            xgzp.begin();
+        }
+      }
+      #ifdef USEDS18B20
+      ds18b20Setup(); 
+      #endif
+      setupRpm(); // this function perform the setup of pio Rpm
+      //printf("rpm done\n");
+      
+      setupEsc() ; 
+
+      core1SetupDone = true;
+      //printf("end core1 setup\n") ;    
+      //getTimerUs(0);   // xxxxx
+}
+	
+void getSensors(void){                                                          // this runs on core1
+
+  
+		voltage.getVoltages();                                                   // read voltage sensors
+		
+		if ( baro1.baroInstalled){                                              // check if baro 1 is present
+			if ( baro1.getAltitude() == 0) {                                      // calculate altitude for baro 1
+				vario1.calculateAltVspeed(baro1.altitudeCm , baro1.altIntervalMicros ); 
+			}
+		} else if ( baro2.baroInstalled){                                        // check if baro 2 is present
+			if ( baro2.getAltitude() == 0) {                                      // calculate altitude for baro 2
+				vario1.calculateAltVspeed(baro2.altitudeCm , baro2.altIntervalMicros); 
+			}
+		} else if (baro3.baroInstalled) {                                        // check if baro 3 is present
+			if ( baro3.getAltitude() == 0) {                                      // calculate altitude for baro 3
+				vario1.calculateAltVspeed(baro3.altitudeCm , baro3.altIntervalMicros); 
+			}
+		} else if (baro4.baroInstalled) {                                        // check if baro 4 (LPS22HB) is present
+			if ( baro4.getAltitude() == 0) {                                      // calculate altitude for baro 4
+				vario1.calculateAltVspeed(baro4.altitudeCm , baro4.altIntervalMicros); 
+			}
+		}
+
+		adc1.readSensor();                                                      // read analog sensor 1
+		adc2.readSensor();                                                      // read analog sensor 2
+		mpu.getAccZWorld();                                                     // read mpu acc Z
+		#ifdef KX134_IS_USED
+		kx134.getAcc();                                                         // read kx134 acc
+		#endif  
+
+		gps.readGps();								                            // Alternativer Standard GPS-Parser
+
+		if (ms4525.airspeedInstalled){                                          // check MS4525 airspeed sensor
+			ms4525.getDifPressure();                                              // read differential pressure
+			calculateAirspeed( );                                                 // calculate airspeed
+			vario1.calculateVspeedDte();                                          // calculate DTE vspeed
+		}
+		if (sdp3x.airspeedInstalled){                                           // check SDP3X airspeed sensor
+			sdp3x.getDifPressure();                                               // read differential pressure
+			calculateAirspeed( );                                                 // calculate airspeed
+			vario1.calculateVspeedDte();                                          // calculate DTE vspeed
+		}
+		if (xgzp.airspeedInstalled){                                            // check XGZP airspeed sensor
+			xgzp.getDifPressure();                                                // read differential pressure
+			calculateAirspeed( );                                                 // calculate airspeed
+			vario1.calculateVspeedDte();                                          // calculate DTE vspeed
+		}
+		readRpm();                                                              // read RPM sensor
+		handleEsc();                                                            // process ESC telemetry
+		#ifdef USE_DS18B20
+		ds18b20Read();                                                          // read DS18B20 temperature sensor
+		#endif
+  
+  
+  // Berechnung für den Anstellwinkel (AoA) - läuft für beide Modi, falls die Daten da sind
+  if (fields[VSPEED].onceAvailable && fields[GROUNDSPEED].onceAvailable && fields[PITCH].onceAvailable){ 
+    float aoa = (float) fields[PITCH].value -  atan2f((float) fields[VSPEED].value, (float) fields[GROUNDSPEED].value) * 180.0 / 3.1416; 
+    sent2Core0( RESERVE5 , (int32_t) aoa) ;                                     
+  }
+}
+
+void setup1(){
+    multicore_lockout_victim_init();
+    //if (config.inav_ltm == 0) 
+    setupSensors();    //  
+    
+    if ((config.inav_ltm == 1) || (config.inav_ltm == 2)) {
+        init_inav_ltm();    //  LTM UART auf GP4 starten        
+    }
+    else if (config.inav_ltm >= 3 ) { // iNav LTM Telemetrie
+        init_frsky_sensors_core1(); 
+        //init_inav_frsky();       // LTM UART auf GP4 starten
+    } 
+    
+}
 
 void loop1() {
     //startTimerUs(MAIN_LOOP1);
     uint8_t qCmd;
 
     // Wenn inav_ltm == 0 ist, läuft die originale oXs-Sensorverarbeitung
-    if (config.inav_ltm == config.inav_ltm) {          //0
+    if (config.inav_ltm == 0) {          //0
 
         getSensors(); // get sensor
 
@@ -1078,7 +1019,7 @@ void loop1() {
                 mpu.gyroCalibrationExecute(); 
             } 
         }
-    } // <-- Hier schließt mstrens das obere "if (config.inav_ltm == 0)"
+    } 
 
     //  MODUS 1 & 2: Altes LTM-Live und LTM-Tischtest (Übergibt die LED-Arbeit an Core 1)
     else if (config.inav_ltm == 1)  {parse_inav_ltm();}
@@ -1095,7 +1036,6 @@ void loop1() {
     
     //alarmTimerUs(MAIN_LOOP1, 500);
 }
-
 
 void core1_main() {
     setup1();
@@ -1115,9 +1055,49 @@ void core1_main() {
 }
 
 
-void core1_main_o(){
-    setup1();
-    while(1) loop1();
+
+
+/*
+void printTest(int testVal){
+    static uint32_t prevTime = 0;
+    if ((millisRp() - prevTime) > 10) { // once per 5 sec
+        prevTime = millisRp();
+        printf("test value=%i\n",testVal);
+        if (configIsValid) {printf("config is valid\n");} else {printf("config is not valid\n");} 
+    }
 }
+*/
+
+
+/*void getSensors_ltm(void)*{
+
+
+    uint32_t now_ms = millisRp(); // Holt den Millisekunden-Takt von Core 0
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+
+    // Zeitstempel für das letzte LTM-Paket merken
+    static uint32_t last_ltm_packet_ms = 0;
+
+    // =========================================================================
+    // MODUS 1: LTM Echtbetrieb über den Hardware-UART
+    // =========================================================================
+    if (config.inav_ltm == 1)  {
+
+        bool altWasAvailable = fields[ALTITUDE].available;
+        bool voltWasAvailable = fields[MVOLT].available;
+
+        parse_inav_ltm(); // Rattert durch deinen LTM Seriell-Parser
+
+
+    } 
+    // =========================================================================
+    // MODUS 2: LTM Simulationsbetrieb am Schreibtisch
+    // =========================================================================
+    else if (config.inav_ltm == 2) {
+
+        simulate_all_sensors_ltm();
+    }
+    
+}*/
 
 

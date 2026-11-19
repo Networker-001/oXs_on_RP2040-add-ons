@@ -1538,6 +1538,20 @@ int8_t handleOneCmd( char * bufferPos){ // handle one command with buffer starti
         }
     }  
 
+     // Kreis oder Überflug
+    if (( strcmp("RT_ORI", pkey) == 0 ) || ( strcmp("RTO", pkey) == 0 ) ){ // if the key is DEBUGTLM
+        if (strcmp("Y", pvalue) == 0) {
+            config.rth_orbit= true;
+            return 0;
+        } else if (strcmp("N", pvalue) == 0) {
+            config.rth_orbit = false;
+            return 0; 
+        } else  {
+            printf("Error : Return to home Orbital must be Y or N\n");
+        }
+    }  
+
+
 
     // Eigener Diagnose-Befehl zur Speicheranalyse
     if ( strcmp("DIAG", pkey) == 0 ) { 
@@ -1936,6 +1950,9 @@ void printConfigAndSequencers(){   // print all and perform checks
         printf("4 (CONV_PIN on GPIO 4)\n")  ;
     }
    
+    printf("Return to home orbital .  =  %c ", config.rth_orbit ? 'Y' : 'N');
+    printf("(RTO = Y .. N)\n");
+
     printf("Return to home min Dist . =  %u ", config.rth_min_Dist);
     printf("(RTD = 2 .. 255)\n");
 
@@ -2361,6 +2378,7 @@ void setupConfig(){   // The config is uploaded at power on
         config.inav_ltm_pin = 2;             
         config.rth_min_Dist = _rth_min_Dist;
         config.rth_min_Speed = _rth_min_Speed;
+        config.rth_orbit = _rth_orbit;
     }     
 
 } 
