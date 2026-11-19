@@ -20,11 +20,11 @@ add_executable(oXs)
 # 2. PROTO_SELECT AUTOMATISCH AUS CONFIG.H AUSLESEN
 # ====================================================================
 file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/src/config.h" CONFIG_LINE REGEX "^#define PROTO_SELECT")
-string(REGEX MATCH "[1-7]" PROTO_SELECT "${CONFIG_LINE}")
+string(REGEX MATCH "[0-9]+" PROTO_SELECT "${CONFIG_LINE}")
 
 # Falls kein Wert in der config.h steht, nimm Modus 1 als Rückfallebene
 if(NOT PROTO_SELECT)
-    set(PROTO_SELECT 1)
+    set(PROTO_SELECT 10)
 endif()
 
 # Den Namen der Ausgabedatei basierend auf der config.h festlegen
@@ -42,6 +42,8 @@ elseif(PROTO_SELECT EQUAL 6)
     set(OUTPUT_NAME "FrSky_2_MPX")
 elseif(PROTO_SELECT EQUAL 7)
     set(OUTPUT_NAME "FrSky_2_Jet")
+elseif(PROTO_SELECT EQUAL 10)
+    set(OUTPUT_NAME "RTH_CRSF")
 endif()
 
 # Weist dem Ziel den neuen dynamischen Namen zu
