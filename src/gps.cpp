@@ -438,8 +438,8 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
     // =========================================================================
     // 🚀 ORBIT- & RTH-PARAMETER 
     // =========================================================================   
-    const float    DEFAULT_RTH_MIN_DIST    = 5.0f;       // Radius/Distanz zu Home in Metern (z.B. 5.0f für Auto, 80.0f für ASK 14)
-    const int32_t  DEFAULT_RTH_MIN_SPEED   = 30;         // Mindestgeschwindigkeit in cm/s (z.B. 30 für Gehtest, 300 für ASK 14)
+    const float    DEFAULT_RTH_MIN_DIST    = 60.0f;       // Radius/Distanz zu Home in Metern (z.B. 5.0f für Auto, 80.0f für ASK 14)
+    const int32_t  DEFAULT_RTH_MIN_SPEED   = 3;         // Mindestgeschwindigkeit in cm/s (z.B. 30 für Gehtest, 300 für ASK 14)
     const float    RTH_GAIN_FACTOR         = 1.5f;       // Aggressivität der Anflug-Lenkung
     
     // do we have new position information?
@@ -452,9 +452,14 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
     // Erst wenn das GPS-Modul das erste Mal sauber antwortet (PDOP nicht mehr 9999 oder 0),
     // wird die Funktion überhaupt freigeschaltet.
     if (GPS_pdop == 9999 || GPS_pdop == 0) {
-        GPS_custom_steering = 5000; // Standard-Mitte erzwingen
+        //GPS_custom_steering = 5000; // Standard-Mitte erzwingen
+        GPS_custom_steering = 0; // Standard-Mitte erzwingen
         current_sats = 0;
-        sent2Core0(HEADING, 5000);  // Telemetrie mit 5000 initialisieren, um -1 zu verhindern
+        //sent2Core0(HEADING, 5000);  // Telemetrie mit 5000 initialisieren, um -1 zu verhindern
+
+        //sent2Core0(HEADING, 0);  // Telemetrie mit 5000 initialisieren, um -1 zu verhindern
+        sent2Core0(GPS_HOME_BEARING, 0);
+
         // return false;               // Funktion vorzeitig abbrechen
     }
 
@@ -532,8 +537,8 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
             GPS_bearing = 90 + atan2f(-off_y, off_x) * 57.2957795f;  
             if (GPS_bearing < 0) GPS_bearing += 360;
             
-            sent2Core0(GPS_HOME_BEARING, (int32_t) GPS_bearing);
-
+            //sent2Core0(GPS_HOME_BEARING, (int32_t) GPS_bearing);
+            sent2Core0(HEADING, (int32_t) GPS_bearing);
             // =========================================================================
             // 🚀 FLIGHTCONTROLLER-ORBIT-LOGIK 
             // =========================================================================
@@ -573,7 +578,8 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
                 } else {
                     // INNERHALB DES KREISES: Sanft nach außen auf den Kreisrand drücken (90° bis 135°)
                     float inside_ratio = (target_orbit_r - distance_m) / target_orbit_r;
-                    tangent_offset_deg = 90.0f + (inside_ratio * 45.0f);
+                   // tangent_offset_deg = 90.0f + (inside_ratio * 45.0f);
+                    tangent_offset_deg = 20.0f + (inside_ratio * 45.0f);
                 }
 
                 // 3. Zielkurs festlegen (Minus für Kreis im Uhrzeigersinn, Plus für Gegenuhrzeigersinn)
@@ -586,10 +592,13 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
                 if (turn_angle > 180.0f)  turn_angle -= 360.0f;
                 if (turn_angle < -180.0f) turn_angle += 360.0f;
 
-                float telemetry_value = ((turn_angle / 3.6f) + 50.0f) * 100.0f;
+               // float telemetry_value = ((turn_angle / 3.6f) + 50.0f) * 100.0f; // 3.6° = 10000, 0° = 5000, -3.6° = 0
+                float telemetry_value = (turn_angle ) * 100.0f /18 ; 
                 GPS_custom_steering = (int32_t)telemetry_value;
+
             } else {
-               // GPS_custom_steering = 5000; 
+                GPS_custom_steering = 0; 
+               //sent2Core0(GPS_HOME_BEARING, 0);
             }
 
 
@@ -603,11 +612,15 @@ bool GPS::parseGpsUblox(void) // move the data from buffer to the different fiel
                 GPS_last_lon = _buffer.posllh.longitude;
             }
             sent2Core0(GPS_CUMUL_DIST, GPS_cumulativeDistCm * 0.01) ;  
-            sent2Core0(HEADING, GPS_custom_steering);
+           // sent2Core0(HEADING, GPS_custom_steering);
+            sent2Core0(GPS_HOME_BEARING, GPS_custom_steering);
+
         } else {
             // Sicherheits-Fallback: Mitte solange kein Lock da ist
-            GPS_custom_steering = 5000;
-            sent2Core0(GPS_HOME_BEARING, (int32_t) GPS_bearing);
+            GPS_custom_steering = 0;
+          // GPS_custom_steering = 5000;
+            sent2Core0(GPS_HOME_BEARING, 0);
+            
         }
  
         // 🛠️ SERIELLE TESTAUSGABE (Gedrosselt auf 1Hz / einmal pro Sekunde bei debugVal == 'Y')

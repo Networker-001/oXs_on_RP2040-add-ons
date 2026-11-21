@@ -249,21 +249,33 @@ void fillFrameAttitude(uint8_t idx){
         fillBufferU8( CRSF_ADDRESS_CRSF_RECEIVER );  
         fillBufferU8( CRSF_FRAME_ATTITUDE_PAYLOAD_SIZE + 2 ); // + 2 because we add type and crc byte 
         fillBufferU8( CRSF_FRAMETYPE_ATTITUDE );
-        //if ( fields[PITCH].available ) {
+
+        if ( fields[PITCH].available ) {
             fillBufferI16( (int16_t) ( (fields[PITCH].value * 1.75) ) ) ; //pitch in 0.01 deg must be converted in 1/10000 of rad )
-        //} else {
-        //    fillBufferI16( (int16_t) 0);
-        //}
-        //if ( fields[ROLL].available ) {
+        } else {
+            fillBufferI16( (int16_t) 0);
+        }
+
+        if ( fields[ROLL].available ) {    
             fillBufferI16( (int16_t) ( (fields[ROLL].value * 1.75) ) ) ; //roll  
-        //} else {
-        //    fillBufferI16( (int16_t) 0);
-        //}
+
+        } else {
+            fillBufferI16( (int16_t) 0);
+        }
         //if ( fields[RPM].available  ) {
         //    fillBufferI16( (int16_t) (fields[RPM].value  )); //= yaw : int16 allows values from -32000 up to +32000; apply SCALE4 if needed
         //} else {
+        if ( fields[YAW].available ){
+            fillBufferI16( (int16_t) ( (fields[YAW].value * 1.75 ) ) ) ; //roll  //          / 1.8 / 10 
+
+        } else if ( fields[GPS_HOME_BEARING].available ){
+            fillBufferI16( (int16_t) ( (fields[GPS_HOME_BEARING].value * 1.75 ) ) ) ; //roll  //          / 1.8 / 10 
+            
+        } else {
             fillBufferI16( (int16_t) 0);
-        //}
+        }
+
+
         fillBufferU8( crsf_crc_out.calc( &CRSFBuffer[2] , CRSF_FRAME_ATTITUDE_PAYLOAD_SIZE+ 1))  ; // CRC skip 2 bytes( addr of message and frame size); length include type + 6 for payload  
         //fields[RPM].available = false ;
         //fields[PITCH].available = false ;

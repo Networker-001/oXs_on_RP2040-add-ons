@@ -22,6 +22,6 @@ void read_frsky_sensors_core1(void);
 void simulate_frsky_sensors_core1();
 //void getSensors_ltm(void);
 
-void printAllTelemetryValues(void);
+//void printAllTelemetryValues(void);
 #endif // INAV_FRSKY_H
 

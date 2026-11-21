@@ -112,6 +112,7 @@ void printConfigAndSequencers();
 void requestMpuCalibration();
 void printConfigOffsets();
 void printFieldValues();
+void printAllTelemetryValues(void);
 void printPwmValues();
 
 void dumpConfig();

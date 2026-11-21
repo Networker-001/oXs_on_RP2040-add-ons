@@ -49,7 +49,7 @@
 
 // SW Version
 
-int SW_Version = 53;
+int SW_Version = 55;
 
 //=====================================================================
 
@@ -206,7 +206,7 @@ static bool receive_software_uart_byte(uint8_t *received_byte) {
 }
 
 // DA=Y
-void printAllTelemetryValues() {
+void printAllTelemetryValues_0() {
     if (debugAll != 'Y') return;
 
     // Aufruf auf 2 Hz (1000 ms) einbremsen
@@ -675,7 +675,7 @@ void decode0x200(int32_t val) {
 // =========================================================================
 int32_t calcDirectRTH(float distance_m, float min_distance_m, float bearing_from_home, float track_deg) {
     if (distance_m <= min_distance_m) {
-        return 5000; // Im Nahbereich sicher auf Neutral (Mitte)
+        return 0; // Im Nahbereich sicher auf Neutral (Mitte)
     }
 
     float bearing_to_home = bearing_from_home + 180.0f;
@@ -685,7 +685,8 @@ int32_t calcDirectRTH(float distance_m, float min_distance_m, float bearing_from
     if (turn_angle > 180.0f)  turn_angle -= 360.0f;
     if (turn_angle < -180.0f) turn_angle += 360.0f;
 
-    return (int32_t)(((turn_angle / 3.6f) + 50.0f) * 100.0f);
+    //return (int32_t)(((turn_angle / 3.6f) + 50.0f) * 100.0f); // Reduzierung auf 0 bis 100
+    return (int32_t)(turn_angle  * 100.0f);
 }
 
 // =========================================================================
@@ -698,7 +699,7 @@ int32_t calcOrbitRTH(float distance_m, float target_radius_m, float bearing_from
     if (pilot_protection_m < 1.5f) pilot_protection_m = 1.5f;
 
     if (distance_m < pilot_protection_m) {
-        return 5000;
+        return 0;
     }
 
     // 2. Direkte Richtung vom Modell ZUM Startpunkt (Home) berechnen (0..360°)
@@ -719,7 +720,7 @@ int32_t calcOrbitRTH(float distance_m, float target_radius_m, float bearing_from
     } else {
         // INNERHALB DES KREISES: Sanft nach außen auf den Kreisrand drücken (80° bis 135°)
         float inside_ratio = (target_radius_m - distance_m) / target_radius_m;
-        tangent_offset_deg = 80.0f + (inside_ratio * 55.0f);
+        tangent_offset_deg = 20.0f + (inside_ratio * 45.0f);
     }
 
     // 4. Zielkurs festlegen (Minus für Rechtskreis im Uhrzeigersinn)
@@ -732,7 +733,8 @@ int32_t calcOrbitRTH(float distance_m, float target_radius_m, float bearing_from
     if (turn_angle > 180.0f)  turn_angle -= 360.0f;
     if (turn_angle < -180.0f) turn_angle += 360.0f;
 
-    return (int32_t)(((turn_angle / 3.6f) + 50.0f) * 100.0f);
+    //return (int32_t)(((turn_angle / 3.6f) + 50.0f) * 100.0f); Reduzierung auf 0 bis 100
+    return (int32_t)(turn_angle  * 100.0f);
 }
 
 
@@ -825,11 +827,13 @@ void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
                 home_lat = min_lat + (current_drift_lat / 2);
                 home_lon = min_lon + (current_drift_lon / 2);
 
-                setField(fields[NUMSAT], 12);
+                setField(fields[NUMSAT], 106);
 
-                live_sat = 12; 
+                live_sat = 106; 
                 home_is_locked = true; 
                 has_sat = true;
+            } else {
+                setField(fields[NUMSAT], 56);
             }
         } 
         else {
@@ -843,8 +847,9 @@ void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
 
     // Solange Home noch nicht gelockt ist, aktiv den Startwert 5000 senden
     if (!home_is_locked) {
-           current_heading_cmd = 5000;
-           setField(fields[HEADING], current_heading_cmd);
+           current_heading_cmd = 0;
+          // setField(fields[HEADING], current_heading_cmd);
+           setField(fields[GPS_HOME_BEARING], 0);
     }
 
     // =========================================================================
@@ -870,7 +875,13 @@ void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
             distance_m = sqrtf((dist_lat * dist_lat) + (dist_lon * dist_lon));
             setField(fields[GPS_HOME_DISTANCE], (int32_t)distance_m);
             setField(fields[TEMP1], (int32_t)distance_m);
-            
+     
+            // 2. Home-Bearing berechnen und in HEADING schreiben
+            float home_bearing = 90.0f + atan2f(-dist_lat, dist_lon) * 57.2957795f;
+            if (home_bearing < 0.0f) {
+                home_bearing += 360.0f;
+            }
+            setField(fields[HEADING], (int32_t)home_bearing);
             fields[NUMSAT].value = 12;
             live_sat = 12;
             has_sat = true;
@@ -903,13 +914,46 @@ void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
 
             // Sonderfall Direkt-RTH im Nahbereich sofort auf 5000 setzen (auch ohne Bewegung)
             if (!use_orbit_mode && distance_m <= active_min_dist) {
-                current_heading_cmd = 5000;
-                setField(fields[HEADING], current_heading_cmd);
+                current_heading_cmd = 0;
+               // setField(fields[HEADING], current_heading_cmd);
+                setField(fields[GPS_HOME_BEARING], 0);
+
                 last_lat = fields[LATITUDE].value;
                 last_lon = fields[LONGITUDE].value;
             }
-            // Reguläre Berechnung bei Fahrt (> min_speed) und >= 3.5m Schrittweite
+                        // Reguläre Berechnung bei Fahrt (> RTS) und >= 3.5m Schrittweite
             else if (current_speed_kmh > active_min_speed && step_dist_m >= 3.5f) {
+                static float smooth_move_lat = 0.0f;
+                static float smooth_move_lon = 0.0f;
+
+                // Glättet die FrSky-Treppenstufen (60% neuer Schritt, 40% vorheriger Schritt)
+                smooth_move_lat = (smooth_move_lat * 0.4f) + (move_lat * 0.6f);
+                smooth_move_lon = (smooth_move_lon * 0.4f) + (move_lon * 0.6f);
+
+                float dLat_calc = (float)(fields[LATITUDE].value - home_lat);
+                float dLon_calc = (float)(fields[LONGITUDE].value - home_lon) * lat_scale;
+                float bearing_from_home = atan2f(dLon_calc, dLat_calc) * 57.29578f;
+                if (bearing_from_home < 0.0f) bearing_from_home += 360.0f;
+
+                float track_deg = atan2f(smooth_move_lon, smooth_move_lat) * 57.29578f;
+                if (track_deg < 0.0f) track_deg += 360.0f;
+
+                int32_t target_cmd = 0;
+                if (use_orbit_mode) {
+                    target_cmd = calcOrbitRTH(distance_m, active_min_dist, bearing_from_home, track_deg, active_min_speed);
+                } else {
+                    target_cmd = calcDirectRTH(distance_m, active_min_dist, bearing_from_home, track_deg);
+                }
+
+                current_heading_cmd = target_cmd / 18;
+                setField(fields[GPS_HOME_BEARING], current_heading_cmd);
+
+                last_lat = fields[LATITUDE].value;
+                last_lon = fields[LONGITUDE].value;
+            }
+
+            // Reguläre Berechnung bei Fahrt (> min_speed) und >= 3.5m Schrittweite alt
+            else if (1>1) {
                 
                 // 1. Peilung von Home zum Modell (0..360°)
                 float dLat_calc = (float)(fields[LATITUDE].value - home_lat);
@@ -922,7 +966,7 @@ void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
                 if (track_deg < 0.0f) track_deg += 360.0f;
 
                 // 3. Gewählten Modus aufrufen
-                int32_t target_cmd = 5000;
+                int32_t target_cmd = 0;
                 if (use_orbit_mode) {
                     target_cmd = calcOrbitRTH(distance_m, active_min_dist, bearing_from_home, track_deg, active_min_speed);
                 } else {
@@ -930,11 +974,18 @@ void decode0x800(int32_t val,  uint8_t buffer[10] ) { // GPS Koordinaten
                 }
 
                 // 4. Schneller 1-Hz-Filter (70% neu, 30% alt)
-                current_heading_cmd = (current_heading_cmd * 3 + target_cmd * 7) / 10;
-                setField(fields[HEADING], current_heading_cmd);
+                // current_heading_cmd = (current_heading_cmd * 3 + target_cmd * 7) / 10;
+                // setField(fields[HEADING], current_heading_cmd);
+                current_heading_cmd = (target_cmd) / 18;
+                setField(fields[GPS_HOME_BEARING], current_heading_cmd);
 
                 last_lat = fields[LATITUDE].value;
                 last_lon = fields[LONGITUDE].value;
+            }
+            // Geschwindigkeit unter Mindestwert (RTS) -> Ruder sicher auf Neutral (0)
+            else  {  // if (current_speed_kmh <= active_min_speed) 
+                current_heading_cmd = 0;
+                setField(fields[GPS_HOME_BEARING], 0);
             }
         }
 
@@ -1468,6 +1519,9 @@ void simulate_frsky_sensors_core1()  {
     static SimConfig cfg_groundspeed = {0,         0,  3000,  40, 1}; // GROUNDSPEED (in cm/s)
     static SimConfig cfg_gps_alt     = {0,     -2000, 20000, 200, 1}; // GPS-Höhe (in cm)
     static SimConfig cfg_heading     = {18000,     0, 35900, 200, 1}; // HEADING (in 1/100 Grad)
+    static SimConfig cfg_roll        = {0,     -1000,  1000, 100, 1}; // ROLL (in 1/100 Grad)
+    static SimConfig cfg_pitch       = {-300,  -1000,  1000, 100, 1}; // PITCH (in 1/100 Grad)
+    static SimConfig cfg_yaw         = {300 ,  -1000,  1000, 100, 1}; // YAW (in 1/100 Grad)
 
     // --- 1. SCHLEIFE: UPDATE DER WERTE INKL. GRENZPRÜFUNG ---
     #define UPDATE_SIM(cfg) do { \
@@ -1488,6 +1542,9 @@ void simulate_frsky_sensors_core1()  {
     UPDATE_SIM(cfg_groundspeed);
     UPDATE_SIM(cfg_gps_alt);
     UPDATE_SIM(cfg_heading);
+    UPDATE_SIM(cfg_roll);
+    UPDATE_SIM(cfg_pitch);
+    UPDATE_SIM(cfg_yaw);
 
     // --- 2. ÜBERGABE AN DAS VALIDIERTE OXS FIELDS-ARRAY ---
 
@@ -1545,6 +1602,9 @@ void simulate_frsky_sensors_core1()  {
     setField(fields[GROUNDSPEED], cfg_groundspeed.current);
     setField(fields[HEADING], cfg_heading.current);
     setField(fields[GPS_HOME_BEARING], cfg_heading.current);
+    setField(fields[ROLL], cfg_roll.current);
+    setField(fields[PITCH], cfg_pitch.current);
+    setField(fields[YAW], cfg_yaw.current);
     setField(fields[GPS_HOME_DISTANCE], cfg_heading.current / 10);
     setField(fields[LATITUDE], 52638400);  // 52.638400° N
     setField(fields[LONGITUDE], 9983100);  // 9.983100° E

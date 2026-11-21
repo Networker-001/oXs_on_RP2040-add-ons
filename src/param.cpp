@@ -236,9 +236,11 @@ void printHelp(){
     printf("     Stabilize mode         GST = YYY           YY = ON or OFF(=hold mode replace stabilize mode)\n");
     //printf("     Orientation(Hoz./Vert.)GOH = X or GOV = X  0(front X+), 1(back X-), 2(left Y+), 3(right Y-), 4(up Z+), 5(down Z-)\n");
     printf("     PID parameters         PIDx = kpA kiA kdA kpE kiE kdE kpR kiR kdR       x=N(normal), H(hold), S(stab)\n");
-    printf("                                                kp, ki, kd are the values of one PID; A,E,R means for Aileron, Elevator, Rudder\n");
+    printf("                                                kp, ki, kd are the values of one PID; A,E,R means for Aileron, Elevator, Rudder\n\n");
 
-    printf("Sequencers                  SEQ = YYYY          See Readme section to see how to fill YYYY\n");
+    printf("Converter                   CONV = ?            Display Converter Commands\n\n"); 
+
+    printf("   Sequencers               SEQ = YYYY          See Readme section to see how to fill YYYY\n");
     printf("                            SEQ = DEL           Erase all sequencer\n");
 
     printf("   Display raw Acc Z        DEBUGACCZ = Y or N  display vertical acc (useful to check offsets)\n");
@@ -246,7 +248,17 @@ void printHelp(){
     printf("                            FVP                 Field Values Positieve (force the tlm values to positieve dummy values\n")  ;
     printf("                            FVN                 idem with negatieve values\n")  ;
 
+    printf("  PWM                   : Display the current PWM values (in micro sec)\n");
+    printf("  DEBUG=HELP            : display commands to get some debug messages (up to next reset)\n");
+    printf("\n");
+    printf("To get the current config, just press Enter; send DUMP in order to get it in a way that allows copy/edit/paste.\n");
+    printf("To save changes, send SAVE; to get list of all commands send ""?""\n");
+    
+    printf("   Note: most changes require a reset after SAVE to be really applied (e.g. to unlock I2C bus)\n");
+}        
 
+void printHelpInav(){
+    
     // =================================================================
     // NEU: SCHNELLÜBERSICHT FÜR DEN I-NAV KONVERTER
     // =================================================================
@@ -255,10 +267,11 @@ void printHelp(){
     printf("  Remark: Inputs have to be with enclosing space ' = ' (e.g. CONV = 1)\n\n")  ;
     
     printf("  1. Input-Mode (Selection for Telemetrie Modul):\n")  ;
+    printf("     CONV = ?           : Display this Help\n"); 
     printf("     CONV = 1           : Activate Converter LTM  (GPIO 5)\n")  ;
     printf("     CONV = 2           : Activate Converter with Simulated Values\n")  ;
     printf("     CONV = 3           : Activate Converter FrSky (GPIO 2)\n")  ;
-    printf("     CONV = 4           : Activate Converter FrSky with Simulated Values\n")  ;
+    printf("     CONV = 4           : Activate Converter FrSky with Simulated Values\n")  ;   
     printf("     CONV = 0           : Deactivate Converter Input\n\n")  ;
     
     printf("  2. Input-PIN (Selection for Telemetrie Modul):\n")  ;
@@ -289,15 +302,7 @@ void printHelp(){
     printf("------------------------------------------\n\n")  ;
 
     // =================================================================
-
-    printf("  PWM                   : Display the current PWM values (in micro sec)\n");
-    printf("  DEBUG=HELP            : display commands to get some debug messages (up to next reset)\n");
-    printf("\n");
-    printf("To get the current config, just press Enter; send DUMP in order to get it in a way that allows copy/edit/paste.\n");
-    printf("To save changes, send SAVE; to get list of all commands send ""?""\n");
-    
-    printf("   Note: most changes require a reset after SAVE to be really applied (e.g. to unlock I2C bus)\n");
-}        
+}
 
 void processCmd(){
     printf("processing cmd\n");
@@ -1474,6 +1479,13 @@ int8_t handleOneCmd( char * bufferPos){ // handle one command with buffer starti
 
 // change INAV LTM setting
     if ( strcmp("INAV", pkey) == 0 || strcmp("INAV_LTM", pkey) == 0 || strcmp("CONV", pkey) == 0 ) { 
+         // 1. Prüfung auf Hilfe-Befehl (?)
+        if ( strcmp("?", pvalue) == 0 ) {
+            printHelpInav();
+            return 0; // 0 zurückgeben, damit die Config nicht unnötig gespeichert wird
+        }
+
+        // 2. Reguläre Zahlen-Prüfung            
         ui = strtoul(pvalue, &ptr, 10);
         if ( *ptr != 0x0){
             printf("Error : CONV / FRSKY setting must be an integer\n");
@@ -2544,6 +2556,178 @@ void printFieldValues(){
     }
     printf("pwmTop= %i\n",pwmTop);
 }
+
+// DA=Y
+void printAllTelemetryValues() {
+    if (debugAll != 'Y') return;
+
+    // Aufruf auf 2 Hz (1000 ms) einbremsen
+    static uint32_t lastPrintTime = 0;
+    uint32_t currentTime = to_ms_since_boot(get_absolute_time()); 
+    if (currentTime - lastPrintTime < 500) return; 
+    lastPrintTime = currentTime; 
+
+    static int lastTotalLines = 0;
+    int coolTermWindowHeight = 45; // Passe dies an deine CoolTerm-Fensterhöhe an
+
+    if (lastTotalLines > 0) {
+        int paddingLines = coolTermWindowHeight - lastTotalLines;
+        if (paddingLines < 1) paddingLines = 1;
+        for (int i = 0; i < paddingLines; i++) {
+            printf("\n");
+        }
+    }
+
+    int currentLinesCount = 0;
+
+    // Kopfzeile drucken
+    printf("=== oXs RP2040 Telemetry Live-Monitor (2 Hz) ===\n");
+    printf("--------------------------------------------------------------------------------------\n");
+    currentLinesCount += 2;
+
+  
+    // Matrix-Definition mit angepasster Reihenfolge (Höhen nach oben gerückt)
+  
+    const int telemetryMatrix[][3] = {
+        { MVOLT, CURRENT, CAPACITY },                               // Zeile 1: Antrieb & Strom
+        { RELATIVEALT, VSPEED, RESERVE1 },                    // Zeile 2: RELATIVEALT an 1. Stelle, VSPEED an 2. Stelle
+        { ALTITUDE, LATITUDE, LONGITUDE},                          // Zeile 3: GPS Core
+        { GROUNDSPEED, HEADING, NUMSAT },                           // Zeile 4: GPS Bewegung
+        { GPS_DATE, GPS_TIME, GPS_PDOP },                           // Zeile 5: GPS Zeit & Signal
+        { GPS_HOME_BEARING, GPS_HOME_DISTANCE, GPS_CUMUL_DIST },    // Zeile 6: GPS Home & Distanz
+        { TEMP1, TEMP2, NUMBER_MAX_IDX },                           // Zeile 7: Temperaturen
+        { PITCH, ROLL, YAW },                                       // Zeile 8: IMU Lage
+        { ACC_X, ACC_Y, ACC_Z },                                    // Zeile 9: IMU Beschleunigung
+        { RPM, AIRSPEED, AIRSPEED_COMPENSATED_VSPEED },             // Zeile 10: Drehzahl & Airspeed
+        { ADS_1_1, ADS_1_2, ADS_1_3 },                              // Zeile 11: ADS Wandler 1
+        { ADS_1_4, ADS_2_1, ADS_2_2 },                              // Zeile 12: ADS Wandler 2
+        { ADS_2_3, ADS_2_4, NUMBER_MAX_IDX },                       // Zeile 13: ADS Wandler 3
+        { SBUS_HOLD_COUNTER, SBUS_FAILSAFE_COUNTER, RESERVE3 },     // Zeile 14: RC-Signal & Status
+        { RESERVE4, RESERVE5, NUMBER_MAX_IDX }                      // Zeile 15: Sequencer & AoA
+    };
+
+
+
+    const int totalRows = sizeof(telemetryMatrix) / sizeof(telemetryMatrix[0]);
+
+    // Array mit den Klarnamen der Felder (starr gekürzt auf max. 12 Zeichen)
+    const char* fieldNames[] = {
+        "LATITUDE", "LONGITUDE", "GROUNDSPEED", "HEADING", "ALTITUDE",
+        "NUMSAT", "GPS_DATE", "GPS_TIME", "GPS_PDOP", "GPS_HOME_BEA",
+        "GPS_HOME_DIS", "MVOLT", "CURRENT", "RESERVE1", "RESERVE2",
+        "CAPACITY", "TEMP1", "TEMP2", "VSPEED", "RELATIVEALT",
+        "PITCH", "ROLL", "YAW", "RPM", "ADS_1_1",
+        "ADS_1_2", "ADS_1_3", "ADS_1_4", "ADS_2_1", "ADS_2_2",
+        "ADS_2_3", "ADS_2_4", "AIRSPEED", "AIRSPEED_COM", "SBUS_HOLD",
+        "SBUS_FAILSAFE", "GPS_CUMUL_DI", "ACC_X", "ACC_Y", "ACC_Z",
+        "RESERVE3", "RESERVE4", "RESERVE5", "RESERVE6", "RESERVE7"
+    };
+
+    // Das überarbeitete, intelligente Formatierungs-Lambda
+    auto formatField = [](char* dest, int id, const char* nameStr) {
+        if (id == NUMBER_MAX_IDX || nameStr[0] == '-') {
+            // Vollkommen leeres Spaltenfenster (Breite: 25 Zeichen) für ausgeblendete Platzhalter
+            snprintf(dest, 27, "%-25s", "");
+            return;
+        }
+
+        // Falls Sensor komplett inaktiv ist -> Namen linksbündig, "n/a" rechtsbündig
+        if (!fields[id].available && !fields[id].onceAvailable) {
+            snprintf(dest, 27, "%-13s %11s", nameStr, "n/a");
+            return;
+        }
+
+        int32_t rawVal = (int32_t)fields[id].value;
+        char valBuffer[16];
+
+        // Unterscheidung der Kommastellen je nach Sensor-ID
+        if (id == LATITUDE || id == LONGITUDE) {
+            // 7 Nachkommastellen (oXs GPS Format)
+            int32_t deg = rawVal / 10000000;
+            int32_t frac = abs(rawVal % 10000000);
+            snprintf(valBuffer, sizeof(valBuffer), "%ld.%07ld", deg, frac);
+        }
+        else if (id == MVOLT || id == CURRENT || id == RESERVE1 || (id >= ADS_1_1 && id <= ADS_2_4)) {
+            // 3 Nachkommastellen (Volt, Ampere, ADS)
+            int32_t mainUnit = rawVal / 1000;
+            int32_t frac = abs(rawVal % 1000);
+            snprintf(valBuffer, sizeof(valBuffer), "%ld.%03ld", mainUnit, frac);
+        }
+       /* else if (id == ALTITUDE || id == VSPEED || id == HEADING) {                 //  || id == RELATIVEALT 
+            // 2 Nachkommastellen (Meter aus cm, m/s aus cm/s, Grad aus 0.01 Grad)
+            int32_t mainUnit = rawVal / 10000000; // oXs nutzt intern für Alt oft Skalierung, hier angepasst auf Standard-cm
+            // Hinweis: Falls deine oXs Version cm liefert, hier durch 100 teilen:
+            mainUnit = rawVal / 100;
+            int32_t frac = abs(rawVal % 100);
+            snprintf(valBuffer, sizeof(valBuffer), "%ld.%02ld", mainUnit, frac);
+        }*/
+        else if (id == ALTITUDE || id == RELATIVEALT || id == VSPEED || id == HEADING) {                 
+            // Hinweis: Falls deine oXs Version cm liefert, hier durch 100 teilen:
+            int32_t mainUnit = rawVal / 100;
+            int32_t frac = abs(rawVal % 100);
+    
+            // Prüfen, ob der Wert negativ ist (auch wenn mainUnit zu 0 wird)
+            if (rawVal < 0) {
+                snprintf(valBuffer, sizeof(valBuffer), "-%ld.%02ld", abs(mainUnit), frac);
+            } else {
+                snprintf(valBuffer, sizeof(valBuffer), "%ld.%02ld", mainUnit, frac);
+            }
+        }
+
+        else if (id == GPS_DATE) {
+            // Formatierung TT.MM.JJ
+            int32_t day = rawVal / 1000000;
+            int32_t month = (rawVal / 10000) % 100;
+            int32_t year = (rawVal / 100) % 100;
+            snprintf(valBuffer, sizeof(valBuffer), "%02ld.%02ld.%02ld", day, month, year);
+        }
+        else if (id == GPS_TIME) {
+            // Formatierung HH:MM:SS
+            int32_t hour = rawVal / 1000000;
+            int32_t min = (rawVal / 10000) % 100;
+            int32_t sec = (rawVal / 100) % 100;
+            snprintf(valBuffer, sizeof(valBuffer), "%02ld:%02ld:%02ld", hour, min, sec);
+        }
+        else {
+            // Reine Ganzzahlen (NUMSAT, CAPACITY, RPM, Counter etc.)
+            snprintf(valBuffer, sizeof(valBuffer), "%ld", rawVal);
+        }
+
+        // Zusammenbauen: Name starr linksbündig (13 Zeichen), Wert starr rechtsbündig (11 Zeichen)
+        snprintf(dest, 27, "%-13s %11s", nameStr, valBuffer);
+    };
+
+    // Matrix ausgeben
+    for (int r = 0; r < totalRows; r++) {
+        int id1 = telemetryMatrix[r][0];
+        int id2 = telemetryMatrix[r][1];
+        int id3 = telemetryMatrix[r][2];
+
+        bool anyAvailable = false;
+        if (id1 != NUMBER_MAX_IDX && (fields[id1].available || fields[id1].onceAvailable)) anyAvailable = true;
+        if (id2 != NUMBER_MAX_IDX && (fields[id2].available || fields[id2].onceAvailable)) anyAvailable = true;
+        if (id3 != NUMBER_MAX_IDX && (fields[id3].available || fields[id3].onceAvailable)) anyAvailable = true;
+
+        if (!anyAvailable) continue;
+
+        char col1[32], col2[32], col3[32];
+
+        formatField(col1, id1, (id1 == NUMBER_MAX_IDX) ? "---" : fieldNames[id1]);
+        formatField(col2, id2, (id2 == NUMBER_MAX_IDX) ? "---" : fieldNames[id2]);
+        formatField(col3, id3, (id3 == NUMBER_MAX_IDX) ? "---" : fieldNames[id3]);
+
+        printf(" %s | %s | %s\n", col1, col2, col3);
+        currentLinesCount++;
+    }
+
+    // Fußzeile drucken
+    printf("-------------------------- stopp mit: DA = N -------------------------------------\n");
+    currentLinesCount++;
+
+    lastTotalLines = currentLinesCount;
+    fflush(stdout); 
+}
+
 
 void printPwmValues(){
     if ( lastRcChannels == 1){
