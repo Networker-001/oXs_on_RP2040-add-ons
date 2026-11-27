@@ -4,8 +4,17 @@ site_url: https://networker-001.github.io/oXs_on_RP2040-add-ons/
 repo_url: https://github.com/Networker-001/oXs_on_RP2040-add-ons
 repo_name: Networker-001/oXs_on_RP2040-add-ons
 
-docs_dir: .
-exclude_docs: |
+nav:
+  - Startseite & Einstieg: index.md
+  - Projekte & Anleitungen:
+      - FrSky S.Port Konverter: Konverter.md
+      - INAV LTM Konverter: INAV Konverter.md
+      - Zusatz-Sensoren & Erweiterungen: oxs.md
+  - Firmware & Downloads (.uf2): https://github.com
+  - Community & Foren:
+      - RC-Network Diskussionsthread: https://rc-network.de
+      - Original-Repository (mstrens): https://github.com
+
   src/
   include/
   lib/
