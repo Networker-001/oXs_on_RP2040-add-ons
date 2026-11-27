@@ -22,7 +22,7 @@ Heute ersetzt ein einziger RP2040-Baustein (oft schon ein winziger RP2040-Zero f
 
 | Hardware & Trägerplatinen | Sender-Integration (EdgeTX) |
 | :---: | :---: |
-| ![oXs Hardware](images/hardware.jpg) | ![EdgeTX Lua](images/tx16s.jpg) |
+| ![oXs Hardware](Bilder/Aufbau.jpg) | ![EdgeTX Lua](images/tx16s.jpg) |
 | *RP2040-Basis & PowerBox-ähnliche Trägerplatinen* | *Drahtlose Einstellung direkt am Farbdisplay* |
 
 ---
