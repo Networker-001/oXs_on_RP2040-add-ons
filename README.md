@@ -1,8 +1,6 @@
 # oXs on RP2040-add-ons  
 # Erweiterte Firmware & Ergänzendes
 
-> **[Zur bebilderten Online-Dokumentation & Projekt-Übersicht](https://github.io)** *(Nutze die Navigation auf der linken Seite für Anleitungen & `.uf2`-Downloads)*
-
 ---
 
 ## Ein Multitalent im Modellbau – die Geschichte & der neue Aufbruch
