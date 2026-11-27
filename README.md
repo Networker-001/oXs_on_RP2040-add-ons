@@ -33,9 +33,9 @@ Heute ersetzt ein einziger RP2040-Baustein (oft schon ein winziger RP2040-Zero f
 | :--- | :--- |
 | **EdgeTX Lua Configurator** *(Coming soon)* | Drahtlose Konfiguration am Sender (CRSF, FrSky S.Port & F.Bus). |
 | **[FrSky S.Port Telemetrie-Konverter](https://github.com/Networker-001/FRSKY-S.Port-Telemetrie-Converter)** | Übersetzung von FrSky S.Port für diverse Protokolle. |
-| **[INAV LTM Telemetrie-Konverter](https://github.com)** | Umsetzung von INAV LTM Telemetriedaten. |
-| **[Return to Home (RTH)](https://github.com)** | GPS-gestützte RTH-Funktion auf dem RP2040. |
-| **[Funktionelle Erweiterungen](oxs.md)** | Laufende Erweiterungen und GPIO-Übersichten. |
+| **[INAV LTM Telemetrie-Konverter](https://github.com/Networker-001/Inav-to-Jeti-Exbus-MPX-Telemetrie-Converter)** | Umsetzung von INAV LTM Telemetriedaten. |
+| **[Return to Home (RTH)](https://github.com/Networker-001/Return-to-home-on-oxs)** | GPS-gestützte RTH-Funktion auf dem RP2040. |
+| **Funktionelle Erweiterungen** *(Seite im Aufbau)* | Laufende Erweiterungen. |
 
 
 
