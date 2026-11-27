@@ -28,11 +28,14 @@ Heute ersetzt ein einziger RP2040-Baustein (oft schon ein winziger RP2040-Zero f
 ---
 # Die Weiterentwicklungen im Überblick
 
+
 | Thema & Projekt | Vorschau (Klick für Details) | Schwerpunkt & Funktion |
 | :--- | :---: | :--- |
-| **EdgeTX Lua Configurator** *(Coming soon)* | ![Lua](Bilder/EdgeTX.jpg) | Pins, Spannungen, Gyro-Werte & 6-Lagen-Kalibrierung **drahtlos am Sender** einstellen (CRSF, FrSky S.Port & F.Bus). || **[FrSky S.Port Telemetrie-Konverter](https://github.com/Networker-001/FRSKY-S.Port-Telemetrie-Converter)** & **[INAV LTM Konverter](INAV%20Konverter.md)** | [![Konverter](https://github.com)](https://github.com/Networker-001/FRSKY-S.Port-Telemetrie-Converter) | Übersetzt **FrSky S.Port** oder **INAV LTM** für Jeti ExBus, Multiplex MSB, CRSF und HoTT (eigenes Doku-Repository). |
+| **EdgeTX Lua Configurator** *(Coming soon)* | ![Lua](Bilder/EdgeTX.jpg) | Pins, Spannungen, Gyro-Werte & 6-Lagen-Kalibrierung **drahtlos am Sender** einstellen (CRSF, FrSky S.Port & F.Bus). |
+| **[FrSky S.Port Telemetrie-Konverter](https://github.com)** & **[INAV LTM Konverter](INAV%20Konverter.md)** | [![Konverter](https://github.com)](https://github.com) | Übersetzt **FrSky S.Port** oder **INAV LTM** für Jeti ExBus, Multiplex MSB, CRSF und HoTT (eigenes Doku-Repository). |
 | **[Return to Home (RTH)](oxs.md)** | [![RTH](Bilder/approach.jpg)](oxs.md) | GPS-gestützte Rückkehrfunktion direkt auf dem RP2040 ohne separaten Flightcontroller. |
 | **[Funktionelle Erweiterungen](oxs.md)** | [![Erweiterungen](Bilder/Musteraufbau2.jpg)](oxs.md) | Laufend neue Funktionen, FrSky `0x0300`-Einzelzellen & zweispaltige 30-GPIO-Übersicht (`PIN=?`) im Terminal. |
+
 
 ---
 
