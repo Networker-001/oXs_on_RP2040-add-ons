@@ -18,6 +18,14 @@ jobs:
         with:
           python-version: '3.x'
       - run: pip install mkdocs-material
+      - name: Prepare docs folder from root files
+        run: |
+          mkdir -p docs
+          cp README.md docs/index.md
+          cp "Konverter.md" docs/
+          cp "INAV Konverter.md" docs/
+          cp "oxs.md" docs/
+          cp -r Bilder docs/ || true
       - run: mkdocs build
       - uses: actions/upload-pages-artifact@v3
         with:
