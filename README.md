@@ -20,9 +20,9 @@ Heute ersetzt ein einziger RP2040-Baustein (oft schon ein winziger RP2040-Zero f
 * **Umfangreiche Multisensor-Telemetrie für fast jedes System:**  
   Ob feinfühliges Variometer (MS5611, SPL06, BMP280), GPS-Daten, Strom- und Spannungsmessung, LiPo-Einzelzellenüberwachung (`0x0300` über ADS1115) oder Drehzahl – oXs übersetzt alle Werte nativ für **ELRS/CRSF, FrSky SmartPort & F.Bus, Jeti ExBus, Multiplex MSB, Graupner HoTT, FlySky iBus, Futaba S.BUS2 und Spektrum SRXL2**.
 
-| Hardware & Trägerplatinen | Sender-Integration (EdgeTX) |
+| Hardware | Sender-Integration (EdgeTX) |
 | :---: | :---: |
-| ![oXs Hardware](Bilder/Aufbau.jpg) | ![EdgeTX Lua](images/tx16s.jpg) |
+| ![oXs Hardware](Bilder/Aufbau.jpg) | ![EdgeTX Lua](Bilder/EdgeTX.jpg) |
 | *RP2040-Basis & PowerBox-ähnliche Trägerplatinen* | *Drahtlose Einstellung direkt am Farbdisplay* |
 
 ---
