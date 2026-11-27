@@ -1,10 +1,9 @@
 site_name: oXs on RP2040 – Erweiterungen & Doku
 site_description: Erweiterte oXs-on-RP2040 Firmware, EdgeTX Lua Configurator, Telemetrie-Konverter und RTH
-site_url: https://github.io
-repo_url: https://github.com
+site_url: https://networker-001.github.io/oXs_on_RP2040-add-ons/
+repo_url: https://github.com/Networker-001/oXs_on_RP2040-add-ons
 repo_name: Networker-001/oXs_on_RP2040-add-ons
 
-# Nutzt direkt das Hauptverzeichnis, damit Bilder/, README.md & bestehende .md-Dateien weiter funktionieren
 docs_dir: .
 exclude_docs: |
   src/
@@ -14,6 +13,9 @@ exclude_docs: |
   test/
   .vscode/
   Doku - Kopie/
+  Doku/
+  doc/
+  Config/
 
 theme:
   name: material
@@ -39,17 +41,13 @@ theme:
     - search.highlight
     - content.code.copy
 
-# Linke Navigation mit Projekten, Anleitungen & .uf2-Downloads
 nav:
   - Startseite & Einstieg: README.md
-  - News & Versionen: news.md
   - Projekte & Anleitungen:
-      - EdgeTX Lua Configurator (oXsConfig): edgetx-lua.md
       - FrSky S.Port Konverter: Konverter.md
       - INAV LTM Konverter: INAV Konverter.md
-      - Zusatz-Sensoren & USB-Pinout: oxs.md
-  - Firmware & Downloads (.uf2):
-      - Übersicht & Download-Links: downloads.md
+      - Zusatz-Sensoren & Erweiterungen: oxs.md
+  - Firmware & Downloads (.uf2): https://github.com
   - Community & Foren:
       - RC-Network Diskussionsthread: https://rc-network.de
       - Original-Repository (mstrens): https://github.com
