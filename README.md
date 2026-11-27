@@ -22,19 +22,17 @@ Heute ersetzt ein einziger RP2040-Baustein (oft schon ein winziger RP2040-Zero f
 
 | Hardware | Sender-Integration (EdgeTX) |
 | :---: | :---: |
-| ![oXs Hardware](Bilder/Musteraufbau.jpg) | ![EdgeTX Lua](Bilder/EdgeTX.jpg) |
+| ![oXs Hardware](Bilder/Piko_Inav.jpg) | ![EdgeTX Lua](Bilder/EdgeTX.jpg) |
 | *RP2040-Basis & PowerBox-ähnliche Trägerplatinen* | *Drahtlose Einstellung direkt am Farbdisplay* |
 
 ---
+# Die Weiterentwicklungen im Überblick
 
-## Die Weiterentwicklungen im Überblick (Details siehe Menü links)
-
-| Thema | Vorschau | Schwerpunkt & Funktion |
+| Thema & Projekt | Vorschau (Klick für Details) | Schwerpunkt & Funktion |
 | :--- | :---: | :--- |
-| **EdgeTX Lua Configurator** | ![Lua](images/lua-thumb.png) | Pins, Spannungen, Gyro-Werte & 6-Lagen-Kalibrierung **drahtlos am Sender** einstellen (CRSF, FrSky S.Port & F.Bus). |
-| **Telemetrie-Konverter** | ![Konverter](images/konverter-thumb.png) | Übersetzt **FrSky S.Port** oder **INAV LTM** für Jeti ExBus, Multiplex MSB, CRSF und HoTT. |
-| **Return to Home (RTH)** | ![RTH](images/rth-thumb.png) | GPS-gestützte Rückkehrfunktion direkt auf dem RP2040 ohne separaten Flightcontroller. |
-| **USB-Pinout & Sensoren** | ![USB](images/usb-thumb.png) | Erweiterte Sensorfunktionen und zweispaltige 30-GPIO-Übersicht (`PIN=?`) im Terminal. |
+| **EdgeTX Lua Configurator** *(Coming soon)* | ![Lua](Bilder/EdgeTX.jpg) | Pins, Spannungen, Gyro-Werte & 6-Lagen-Kalibrierung **drahtlos am Sender** einstellen (CRSF, FrSky S.Port & F.Bus). || **[FrSky S.Port Telemetrie-Konverter](https://github.com/Networker-001/FRSKY-S.Port-Telemetrie-Converter)** & **[INAV LTM Konverter](INAV%20Konverter.md)** | [![Konverter](https://github.com)](https://github.com/Networker-001/FRSKY-S.Port-Telemetrie-Converter) | Übersetzt **FrSky S.Port** oder **INAV LTM** für Jeti ExBus, Multiplex MSB, CRSF und HoTT (eigenes Doku-Repository). |
+| **[Return to Home (RTH)](oxs.md)** | [![RTH](Bilder/approach.jpg)](oxs.md) | GPS-gestützte Rückkehrfunktion direkt auf dem RP2040 ohne separaten Flightcontroller. |
+| **[Funktionelle Erweiterungen](oxs.md)** | [![Erweiterungen](Bilder/Musteraufbau2.jpg)](oxs.md) | Laufend neue Funktionen, FrSky `0x0300`-Einzelzellen & zweispaltige 30-GPIO-Übersicht (`PIN=?`) im Terminal. |
 
 ---
 
